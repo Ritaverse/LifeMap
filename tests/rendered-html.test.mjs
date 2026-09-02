@@ -31,3 +31,11 @@ test("server-renders directly addressable Phase 1 routes", async () => {
     assert.match(await response.text(), /Life Map/);
   }
 });
+
+test("unknown dynamic records render a useful error state", async () => {
+  for (const path of ["/insights/missing", "/life-map/missing", "/objects/missing"]) {
+    const response = await render(path);
+    assert.equal(response.status, 200, path);
+    assert.match(await response.text(), /没有找到/);
+  }
+});

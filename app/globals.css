@@ -105,6 +105,10 @@ h1, h2, h3, p { margin-top: 0; }
 .disclosure--center { margin: 32px auto 0; text-align: center; }
 .fixture-label { display: inline-flex; width: fit-content; padding: 5px 9px; border: 1px solid var(--color-line); border-radius: var(--radius-pill); color: var(--color-ink-muted); font-size: 9px; font-weight: 750; letter-spacing: .1em; }
 .inline-notice { padding: 14px 16px; border-left: 3px solid var(--color-gold-muted); background: rgb(154 122 72 / 8%); color: var(--color-ink-soft); font-size: 12px; }
+.state-page { display: flex; min-height: calc(100vh - 180px); max-width: 640px; flex-direction: column; align-items: flex-start; justify-content: center; }
+.state-page h1 { margin-bottom: 12px; font-family: var(--font-editorial); font-size: clamp(38px, 7vw, 56px); font-weight: 500; }
+.state-page > p:not(.eyebrow) { max-width: 540px; margin-bottom: 28px; }
+.state-mark { display: grid; place-items: center; width: 74px; height: 74px; margin-bottom: 28px; border: 1px solid var(--color-cinnabar); border-radius: 50%; color: var(--color-cinnabar); font-family: var(--font-editorial); font-size: 28px; }
 .pill, .pill-row span { display: inline-flex; align-items: center; min-height: 27px; padding: 0 10px; border-radius: var(--radius-pill); background: var(--color-jade-soft); color: var(--color-jade-deep); font-size: 10px; font-weight: 700; letter-spacing: .04em; }
 .pill-row { display: flex; flex-wrap: wrap; gap: 8px; }
 
@@ -486,6 +490,7 @@ h1, h2, h3, p { margin-top: 0; }
 .product-action > div { display: grid; gap: 3px; }
 .product-action small { color: var(--color-ink-muted); font-size: 9px; }
 .product-action strong { font-family: var(--font-editorial); font-size: 25px; }
+.wishlist-status { min-height: 18px; margin: 8px 0 0; color: var(--color-jade); font-size: 10px; }
 
 /* Me */
 .me-page { max-width: 760px; }

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { AnchorHTMLAttributes, FormEvent, ReactNode } from "react";
 import { askResponses, demoProfile, domains, iching, insights, products, recommendation, timing } from "../lib/data";
-import { getDomain, getInsight, getProduct, resolveEvidence, routeAsk } from "../lib/repository";
+import { getInsight, resolveEvidence, routeAsk } from "../lib/repository";
 import type { AskResponse, EvidenceRef, IChingLine, Product, SystemId } from "../lib/types";
 
 type RouteName = "landing" | "onboarding" | "generating" | "today" | "insight" | "life-map" | "domain" | "ask" | "iching" | "timing" | "objects" | "product" | "me";
@@ -117,6 +117,20 @@ function ProductVisual({ product, compact = false }: { product: Product; compact
       <i /><i /><i />
       <small>DEMO OBJECT · 01</small>
     </div>
+  );
+}
+
+function ErrorState({ route, title, message, href, action }: { route: RouteName; title: string; message: string; href: string; action: string }) {
+  return (
+    <PageShell route={route} title="未找到" eyebrow="DEMO ERROR" backHref={href}>
+      <div className="page state-page">
+        <div className="state-mark" aria-hidden="true">?</div>
+        <p className="eyebrow">THIS DEMO PATH IS MISSING</p>
+        <h1>{title}</h1>
+        <p>{message}</p>
+        <Link href={href} className="button button--primary">{action} <span aria-hidden="true">→</span></Link>
+      </div>
+    </PageShell>
   );
 }
 
@@ -286,7 +300,8 @@ function TodayPage() {
 }
 
 function InsightPage({ id }: { id?: string }) {
-  const insight = getInsight(id ?? insights[0].id);
+  const insight = insights.find((item) => item.id === (id ?? insights[0].id));
+  if (!insight) return <ErrorState route="insight" title="没有找到这个洞察" message="这个演示洞察可能已被移动，或链接并不存在。你的固定演示数据没有受到影响。" href="/today" action="回到今日" />;
   return (
     <PageShell route="insight" title="为什么？" eyebrow="INSIGHT EVIDENCE" backHref="/today">
       <div className="page reading-page">
@@ -314,7 +329,8 @@ function LifeMapPage() {
 }
 
 function DomainPage({ id }: { id?: string }) {
-  const domain = getDomain(id ?? "career");
+  const domain = domains.find((item) => item.id === (id ?? "career"));
+  if (!domain) return <ErrorState route="domain" title="没有找到这个生命领域" message="这个演示领域不存在。你可以回到 Life Map 查看八个可用领域。" href="/life-map" action="查看 Life Map" />;
   const insight = getInsight(domain.insightId);
   const dimensions = domain.dimensions ?? [
     { label: "内在驱动", qualitativeValue: "high" as const, internalValue: 0.78 },
@@ -408,11 +424,13 @@ function ObjectsPage() {
 }
 
 function ProductPage({ id }: { id?: string }) {
-  const product = getProduct(id ?? products[0].slug);
+  const product = products.find((item) => item.id === (id ?? products[0].slug) || item.slug === (id ?? products[0].slug));
+  const [saved, setSaved] = useState(false);
+  if (!product) return <ErrorState route="product" title="没有找到这件象征物" message="这件演示物品可能已被移动，或链接并不存在。你仍可以浏览完整的演示收藏。" href="/objects" action="浏览象征物" />;
   const isFeatured = product.id === recommendation.productId;
   return (
     <PageShell route="product" title="象征物详情" eyebrow="OBJECT DETAIL" backHref="/objects">
-      <div className="page product-page"><div className="product-layout"><div className="product-gallery"><ProductVisual product={product} /><div className="gallery-thumbs"><button aria-label="查看主图" className="is-active"><span /></button><button aria-label="查看材质细节"><span /></button><button aria-label="查看日常使用情境"><span /></button></div></div><article className="product-detail"><p className="eyebrow">PERSONAL SYMBOL · OPTIONAL</p><h1>{product.nameEn}</h1><h2>{product.nameZh}</h2><p className="product-intro">{product.shortDescription}</p>{isFeatured && <><section className="why-section"><p className="eyebrow">WHY IT SHOWED UP FOR YOU</p><h3>{recommendation.headline}</h3><p>{recommendation.summary}</p><div className="reason-list">{recommendation.reasons.map((reason) => <article key={reason.id}><span>{reason.label}</span><p>{reason.explanation}</p></article>)}</div></section><section className="practice practice--large"><span>{recommendation.nonCommercialPractice.title}</span><p>{recommendation.nonCommercialPractice.instruction}</p></section></>}<section className="association"><p className="eyebrow">TRADITIONAL ASSOCIATION</p><p>{product.traditionalMeaning}</p><div className="pill-row">{product.elements.concat(product.intentions).map((item) => <span className="pill" key={item}>{item}</span>)}</div></section><section className="daily-use"><p className="eyebrow">A SIMPLE DAILY USE</p><h3>让它成为一个动作提示</h3><p>{product.dailyUse}</p></section><details className="product-info" open><summary>材质与信息</summary><dl><div><dt>材质</dt><dd>{product.material}</dd></div><div><dt>产地</dt><dd>{product.origin}</dd></div><div><dt>尺寸</dt><dd>{product.dimensions}</dd></div><div><dt>养护</dt><dd>{product.care}</dd></div></dl></details><div className="product-action"><div><small>演示价格</small><strong>{product.price}</strong></div><button className="button button--primary">加入愿望清单</button></div><p className="disclosure">{isFeatured ? recommendation.disclaimer : "这些关联来自传统及现代象征文化，不是科学功效或结果保证。"} Phase 1 不提供购买。</p></article></div></div>
+      <div className="page product-page"><div className="product-layout"><div className="product-gallery"><ProductVisual product={product} /><div className="gallery-thumbs"><button aria-label="查看主图" className="is-active"><span /></button><button aria-label="查看材质细节"><span /></button><button aria-label="查看日常使用情境"><span /></button></div></div><article className="product-detail"><p className="eyebrow">PERSONAL SYMBOL · OPTIONAL</p><h1>{product.nameEn}</h1><h2>{product.nameZh}</h2><p className="product-intro">{product.shortDescription}</p>{isFeatured && <><section className="why-section"><p className="eyebrow">WHY IT SHOWED UP FOR YOU</p><h3>{recommendation.headline}</h3><p>{recommendation.summary}</p><div className="reason-list">{recommendation.reasons.map((reason) => <article key={reason.id}><span>{reason.label}</span><p>{reason.explanation}</p></article>)}</div></section><section className="practice practice--large"><span>{recommendation.nonCommercialPractice.title}</span><p>{recommendation.nonCommercialPractice.instruction}</p></section></>}<section className="association"><p className="eyebrow">TRADITIONAL ASSOCIATION</p><p>{product.traditionalMeaning}</p><div className="pill-row">{product.elements.concat(product.intentions).map((item) => <span className="pill" key={item}>{item}</span>)}</div></section><section className="daily-use"><p className="eyebrow">A SIMPLE DAILY USE</p><h3>让它成为一个动作提示</h3><p>{product.dailyUse}</p></section><details className="product-info" open><summary>材质与信息</summary><dl><div><dt>材质</dt><dd>{product.material}</dd></div><div><dt>产地</dt><dd>{product.origin}</dd></div><div><dt>尺寸</dt><dd>{product.dimensions}</dd></div><div><dt>养护</dt><dd>{product.care}</dd></div></dl></details><div className="product-action"><div><small>演示价格</small><strong>{product.price}</strong></div><button className="button button--primary" aria-pressed={saved} onClick={() => setSaved((value) => !value)}>{saved ? "已加入愿望清单" : "加入愿望清单"}</button></div><p className="wishlist-status" aria-live="polite">{saved ? "已在当前演示会话中保存。" : ""}</p><p className="disclosure">{isFeatured ? recommendation.disclaimer : "这些关联来自传统及现代象征文化，不是科学功效或结果保证。"} Phase 1 不提供购买。</p></article></div></div>
     </PageShell>
   );
 }
