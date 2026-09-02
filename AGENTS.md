@@ -34,13 +34,13 @@ Treat these documents as the product source of truth. If implementation code exi
 
 ## Current Phase
 
-Phase 2A is the active slice: **deterministic BaZi calculation foundations** layered onto the validated Phase 1 experience.
+Phase 2A is the active slice: **deterministic BaZi calculation foundations and real birth-location search** layered onto the validated Phase 1 experience.
 
 The current vertical slice is:
 
 > Birth onboarding → normalized local birth profile → versioned BaZi engine → structured Four Pillars facts → clearly separated demo interpretation
 
-Real BaZi calculation is authorized in Phase 2A. Keep Zi Wei, Western ephemeris/transits, live AI, geocoding, timezone-history, payments, and authentication out of this slice. Do not present Phase 1 fixture interpretations as conclusions derived from a newly calculated chart.
+Real BaZi calculation and explicit city/country geocoding through the approved location adapter are authorized in Phase 2A. Keep Zi Wei, Western ephemeris/transits, live AI, historical timezone resolution, payments, and authentication out of this slice. Never send a name, birth date, or birth time to the geocoding provider. Do not present Phase 1 fixture interpretations as conclusions derived from a newly calculated chart.
 
 ## Working Priorities
 
@@ -194,6 +194,7 @@ Never commit secrets or personal data. Store local values in ignored `.env` file
 
 Phase 2A is complete only when:
 
+- A selected global city produces a validated country, coordinate, and IANA-timezone record.
 - Supported birth inputs produce deterministic, versioned Four Pillars output.
 - Unknown birth time omits the time pillar and exposes boundary limitations.
 - Calculation rules and engine version are visible to the user.

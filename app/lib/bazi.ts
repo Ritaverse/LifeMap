@@ -6,17 +6,21 @@ export const BAZI_ENGINE = {
   schemaVersion: "life-map.bazi.v1",
 } as const;
 
-export type BirthPlaceId = "shanghai" | "beijing" | "taipei" | "los-angeles";
 export type TraditionalGender = "female" | "male" | "nonbinary" | "prefer-not-to-say";
 export type PillarKind = "year" | "month" | "day" | "time";
 export type FiveElement = "木" | "火" | "土" | "金" | "水";
 
 export interface BirthPlace {
-  id: BirthPlaceId;
+  id: string;
   label: string;
+  city: string;
+  admin1?: string;
+  country: string;
+  countryCode: string;
   latitude: number;
   longitude: number;
   timeZone: string;
+  source: "open-meteo" | "sample-default";
 }
 
 export interface BirthProfileInput {
@@ -24,7 +28,7 @@ export interface BirthProfileInput {
   birthDate: string;
   birthTime: string | null;
   timeAccuracy: "known" | "unknown";
-  placeId: BirthPlaceId;
+  birthPlace: BirthPlace;
   traditionalGender: TraditionalGender;
 }
 
@@ -71,19 +75,24 @@ export interface BaziReading {
   caveats: string[];
 }
 
-export const birthPlaces: BirthPlace[] = [
-  { id: "shanghai", label: "Shanghai, China", latitude: 31.2304, longitude: 121.4737, timeZone: "Asia/Shanghai" },
-  { id: "beijing", label: "Beijing, China", latitude: 39.9042, longitude: 116.4074, timeZone: "Asia/Shanghai" },
-  { id: "taipei", label: "Taipei, Taiwan", latitude: 25.033, longitude: 121.5654, timeZone: "Asia/Taipei" },
-  { id: "los-angeles", label: "Los Angeles, United States", latitude: 34.0522, longitude: -118.2437, timeZone: "America/Los_Angeles" },
-];
+export const defaultBirthPlace: BirthPlace = {
+  id: "sample:shanghai",
+  label: "Shanghai, China",
+  city: "Shanghai",
+  country: "China",
+  countryCode: "CN",
+  latitude: 31.2304,
+  longitude: 121.4737,
+  timeZone: "Asia/Shanghai",
+  source: "sample-default",
+};
 
 export const demoBirthProfile: BirthProfileInput = {
   displayName: "Yu",
   birthDate: "1990-06-17",
   birthTime: "09:32",
   timeAccuracy: "known",
-  placeId: "shanghai",
+  birthPlace: defaultBirthPlace,
   traditionalGender: "prefer-not-to-say",
 };
 
@@ -94,10 +103,29 @@ const stemElements: Record<string, FiveElement> = {
 
 const elementNames = new Set<FiveElement>(["木", "火", "土", "金", "水"]);
 
-export function getBirthPlace(placeId: BirthPlaceId): BirthPlace {
-  const place = birthPlaces.find((item) => item.id === placeId);
-  if (!place) throw new Error("Unsupported birthplace option");
-  return place;
+export function isBirthPlace(value: unknown): value is BirthPlace {
+  if (!value || typeof value !== "object") return false;
+  const place = value as Partial<BirthPlace>;
+  return (
+    typeof place.id === "string" && place.id.length > 0 &&
+    typeof place.label === "string" && place.label.length > 0 &&
+    typeof place.city === "string" && place.city.length > 0 &&
+    typeof place.country === "string" && place.country.length > 0 &&
+    typeof place.countryCode === "string" && /^[A-Z]{2}$/.test(place.countryCode) &&
+    typeof place.latitude === "number" && Number.isFinite(place.latitude) && Math.abs(place.latitude) <= 90 &&
+    typeof place.longitude === "number" && Number.isFinite(place.longitude) && Math.abs(place.longitude) <= 180 &&
+    typeof place.timeZone === "string" && isTimeZone(place.timeZone) &&
+    (place.source === "open-meteo" || place.source === "sample-default")
+  );
+}
+
+function isTimeZone(value: string) {
+  try {
+    new Intl.DateTimeFormat("en", { timeZone: value }).format(0);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function parseBirthDate(value: string) {
@@ -177,7 +205,8 @@ export function calculateBazi(profile: BirthProfileInput): BaziReading {
   if (!profile.displayName.trim()) throw new Error("Display name is required");
   const { year, month, day } = parseBirthDate(profile.birthDate);
   const { hour, minute } = parseBirthTime(profile.birthTime, profile.timeAccuracy);
-  const place = getBirthPlace(profile.placeId);
+  if (!isBirthPlace(profile.birthPlace)) throw new Error("Birthplace selection is invalid");
+  const place = profile.birthPlace;
   const lunar = Solar.fromYmdHms(year, month, day, hour, minute, 0).getLunar();
   const eightChar = lunar.getEightChar();
   eightChar.setSect(2);

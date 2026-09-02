@@ -1,6 +1,8 @@
 # Life Map
 
-Life Map is a mobile-first personal reflection product combining BaZi, Zi Wei Dou Shu, Western astrology, I Ching, and explainable synthesis. Phase 2A adds deterministic BaZi Four Pillars calculation for supported birth inputs. Zi Wei, Western astrology, timing, and synthesis remain clearly labeled Phase 1 fixtures; there are still no live AI, payment, authentication, analytics, or application network requests.
+Life Map is a mobile-first personal reflection product combining BaZi, Zi Wei Dou Shu, Western astrology, I Ching, and explainable synthesis. Phase 2A adds deterministic BaZi Four Pillars calculation and global city search for birth inputs. Zi Wei, Western astrology, timing, and synthesis remain clearly labeled Phase 1 fixtures; there are still no live AI, payment, authentication, or analytics requests.
+
+Location search sends only an explicitly submitted city/country query to the Open-Meteo geocoding endpoint. Names, birth dates, and birth times stay in the browser session. The public endpoint is suitable for this private prototype; commercial production use requires reviewing Open-Meteo customer access and pricing.
 
 ## Run locally
 
@@ -33,6 +35,7 @@ npm run build      # deployment build
 - `app/lib/types.ts` defines typed domain contracts.
 - `app/lib/data.ts` contains deterministic fictional fixtures.
 - `app/lib/bazi.ts` owns versioned Four Pillars calculation and conventions.
+- `app/lib/place-search.ts` maps global geocoding results into validated birth places.
 - `app/lib/profile-storage.ts` limits sensitive birth inputs to the browser session.
 - `app/lib/repository.ts` resolves references and isolates data access.
 - `tests/` validates calculation fixtures and boundaries, fixture integrity, Ask routing, I Ching ordering, and direct routes.

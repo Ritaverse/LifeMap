@@ -3,8 +3,9 @@
 import { useEffect, useMemo, useState } from "react";
 import type { AnchorHTMLAttributes, FormEvent, ReactNode } from "react";
 import { askResponses, domains, iching, insights, products, recommendation, timing } from "../lib/data";
-import { birthPlaces, calculateBazi, demoBaziReading, demoBirthProfile, getBirthPlace } from "../lib/bazi";
-import type { BaziReading, FiveElement } from "../lib/bazi";
+import { calculateBazi, defaultBirthPlace, demoBaziReading, demoBirthProfile } from "../lib/bazi";
+import type { BaziReading, BirthPlace, FiveElement } from "../lib/bazi";
+import { searchBirthPlaces } from "../lib/place-search";
 import { clearBirthProfile, readBirthProfile, readOnboardingDraft, writeBirthProfile, writeOnboardingDraft } from "../lib/profile-storage";
 import type { OnboardingDraft } from "../lib/profile-storage";
 import { getInsight, resolveEvidence, routeAsk } from "../lib/repository";
@@ -230,7 +231,7 @@ const onboardingSteps = [
   { id: "name", number: "01", title: "怎么称呼你？", helper: "我们会用这个名字，让体验更自然。" },
   { id: "date", number: "02", title: "你的出生日期", helper: "日期会进入真实八字四柱计算。" },
   { id: "time", number: "03", title: "你的出生时间", helper: "当地时间用于确定时柱；不知道时可以生成暂缺时柱的结果。" },
-  { id: "location", number: "04", title: "你出生在哪里？", helper: "首个计算版本支持四个已校验的地点与时区。" },
+  { id: "location", number: "04", title: "你出生在哪里？", helper: "搜索城市与国家，再从真实地点结果中确认出生地。" },
   { id: "rules", number: "05", title: "传统规则输入", helper: "本轮先记录此项；后续运势与紫微引擎才会使用。" },
   { id: "review", number: "06", title: "确认计算范围", helper: "八字将真实计算；紫微、西占和综合解释仍使用演示内容。" },
 ];
@@ -240,17 +241,68 @@ const defaultOnboardingDraft: OnboardingDraft = {
   date: demoBirthProfile.birthDate,
   time: demoBirthProfile.birthTime ?? "12:00",
   unknownTime: false,
-  locationId: demoBirthProfile.placeId,
+  locationQuery: defaultBirthPlace.label,
+  selectedPlace: defaultBirthPlace,
   gender: demoBirthProfile.traditionalGender,
   consent: false,
 };
+
+function BirthplaceSearch({ query, selectedPlace, onQueryChange, onSelect }: { query: string; selectedPlace: BirthPlace | null; onQueryChange: (value: string) => void; onSelect: (place: BirthPlace | null) => void }) {
+  const [results, setResults] = useState<BirthPlace[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [message, setMessage] = useState("");
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (query.trim().length < 2) {
+      setMessage("请输入至少两个字，并尽量加上国家或地区。");
+      return;
+    }
+    setSearching(true);
+    setMessage("");
+    setResults([]);
+    try {
+      const places = await searchBirthPlaces(query, { language: navigator.language });
+      setResults(places);
+      if (!places.length) setMessage("没有找到匹配地点。请尝试“城市, 国家”的写法。");
+    } catch {
+      setMessage("地点服务暂时没有响应，请稍后重试。你已填写的其他资料不会丢失。");
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  const updateQuery = (value: string) => {
+    onQueryChange(value);
+    if (selectedPlace && value !== selectedPlace.label) onSelect(null);
+  };
+
+  const choose = (place: BirthPlace) => {
+    onSelect(place);
+    onQueryChange(place.label);
+    setResults([]);
+    setMessage("");
+  };
+
+  return (
+    <div className="location-search">
+      <form onSubmit={submit} className="location-search__form">
+        <label className="field"><span>城市与国家</span><input value={query} onChange={(event) => updateQuery(event.target.value)} placeholder="例如 成都, 中国 / Paris, France" autoComplete="off" /></label>
+        <button className="button button--secondary" type="submit" disabled={searching}>{searching ? "搜索中…" : "搜索地点"}</button>
+      </form>
+      <p className="location-search__privacy">只有这次地点关键词会发送至 <a href="https://open-meteo.com/en/docs/geocoding-api" target="_blank" rel="noreferrer">Open-Meteo 地点服务</a>；姓名、出生日期和时间不会发送。</p>
+      {message && <p className="inline-notice" role="status">{message}</p>}
+      {results.length > 0 && <ul className="location-results" aria-label="地点搜索结果">{results.map((place) => <li key={place.id}><button type="button" onClick={() => choose(place)}><span><strong>{place.city}</strong><small>{[place.admin1, place.country].filter(Boolean).join(" · ")}</small></span><span><b>{place.timeZone}</b><small>{place.latitude.toFixed(3)}, {place.longitude.toFixed(3)}</small></span></button></li>)}</ul>}
+      {selectedPlace && <div className="selected-location" aria-live="polite"><span aria-hidden="true">✓</span><div><small>已选择真实地点</small><strong>{selectedPlace.label}</strong><p>{selectedPlace.timeZone} · {selectedPlace.latitude.toFixed(4)}, {selectedPlace.longitude.toFixed(4)}</p></div></div>}
+    </div>
+  );
+}
 
 function OnboardingPage() {
   const [step, setStep] = useState(0);
   const [form, setForm] = useState<OnboardingDraft>(defaultOnboardingDraft);
   const [error, setError] = useState("");
   const current = onboardingSteps[step];
-  const selectedPlace = getBirthPlace(form.locationId);
 
   useEffect(() => {
     queueMicrotask(() => setForm(readOnboardingDraft(defaultOnboardingDraft)));
@@ -262,7 +314,7 @@ function OnboardingPage() {
     if (current.id === "name") return form.name.trim().length > 0;
     if (current.id === "date") return Boolean(form.date);
     if (current.id === "time") return form.unknownTime || Boolean(form.time);
-    if (current.id === "location") return Boolean(form.locationId);
+    if (current.id === "location") return Boolean(form.selectedPlace);
     if (current.id === "review") return form.consent;
     return true;
   }, [current.id, form]);
@@ -270,13 +322,17 @@ function OnboardingPage() {
   const next = () => {
     if (!valid) return;
     if (step === onboardingSteps.length - 1) {
+      if (!form.selectedPlace) {
+        setError("请先搜索并选择一个真实出生地点。");
+        return;
+      }
       try {
         const profile = {
           displayName: form.name,
           birthDate: form.date,
           birthTime: form.unknownTime ? null : form.time,
           timeAccuracy: form.unknownTime ? "unknown" as const : "known" as const,
-          placeId: form.locationId,
+          birthPlace: form.selectedPlace,
           traditionalGender: form.gender,
         };
         calculateBazi(profile);
@@ -306,10 +362,10 @@ function OnboardingPage() {
               <label className="field"><span>当地时间</span><input type="time" value={form.time} disabled={form.unknownTime} onChange={(event) => setForm({ ...form, time: event.target.value })} /></label>
               <label className="check-field"><input type="checkbox" checked={form.unknownTime} onChange={(event) => setForm({ ...form, unknownTime: event.target.checked })} /><span><strong>我不知道准确时间</strong><small>本阶段会省略八字时柱；未来紫微宫位与西占上升也会标记为不确定。</small></span></label>
             </>}
-            {current.id === "location" && <label className="field"><span>出生地点</span><select value={form.locationId} onChange={(event) => setForm({ ...form, locationId: event.target.value as OnboardingDraft["locationId"] })}>{birthPlaces.map((place) => <option key={place.id} value={place.id}>{place.label}</option>)}</select><small>已解析：{Math.abs(selectedPlace.latitude).toFixed(4)}° {selectedPlace.latitude >= 0 ? "N" : "S"} · {selectedPlace.timeZone}</small></label>}
+            {current.id === "location" && <BirthplaceSearch query={form.locationQuery} selectedPlace={form.selectedPlace} onQueryChange={(locationQuery) => setForm((value) => ({ ...value, locationQuery }))} onSelect={(selectedPlace) => setForm((value) => ({ ...value, selectedPlace }))} />}
             {current.id === "rules" && <fieldset className="choice-field"><legend>传统规则输入（选填）</legend>{[["female", "女性"], ["male", "男性"], ["nonbinary", "非二元"], ["prefer-not-to-say", "不愿说明"]].map(([value, label]) => <label key={value}><input type="radio" name="gender" value={value} checked={form.gender === value} onChange={(event) => setForm({ ...form, gender: event.target.value as OnboardingDraft["gender"] })} /><span>{label}</span></label>)}</fieldset>}
             {current.id === "review" && <div className="review-card">
-              <dl><div><dt>称呼</dt><dd>{form.name}</dd></div><div><dt>出生日期</dt><dd>{form.date}</dd></div><div><dt>出生时间</dt><dd>{form.unknownTime ? "未知（不计算时柱）" : form.time}</dd></div><div><dt>出生地点</dt><dd>{selectedPlace.label}</dd></div><div><dt>时区</dt><dd>{selectedPlace.timeZone}</dd></div></dl>
+              <dl><div><dt>称呼</dt><dd>{form.name}</dd></div><div><dt>出生日期</dt><dd>{form.date}</dd></div><div><dt>出生时间</dt><dd>{form.unknownTime ? "未知（不计算时柱）" : form.time}</dd></div><div><dt>出生地点</dt><dd>{form.selectedPlace?.label ?? "尚未选择"}</dd></div><div><dt>时区</dt><dd>{form.selectedPlace?.timeZone ?? "—"}</dd></div></dl>
               <label className="check-field"><input type="checkbox" checked={form.consent} onChange={(event) => setForm({ ...form, consent: event.target.checked })} /><span><strong>我理解当前的计算范围</strong><small>八字四柱会真实计算；紫微、西占、时运与综合解释仍是固定演示，不代表我的个人结果。</small></span></label>
             </div>}
           </div>
