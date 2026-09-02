@@ -1,0 +1,444 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import type { AnchorHTMLAttributes, FormEvent, ReactNode } from "react";
+import { askResponses, demoProfile, domains, iching, insights, products, recommendation, timing } from "../lib/data";
+import { getDomain, getInsight, getProduct, resolveEvidence, routeAsk } from "../lib/repository";
+import type { AskResponse, EvidenceRef, IChingLine, Product, SystemId } from "../lib/types";
+
+type RouteName = "landing" | "onboarding" | "generating" | "today" | "insight" | "life-map" | "domain" | "ask" | "iching" | "timing" | "objects" | "product" | "me";
+
+function Link({ href, ...props }: AnchorHTMLAttributes<HTMLAnchorElement> & { href: string }) {
+  return <a href={href} {...props} />;
+}
+
+function navigate(href: string) {
+  window.location.assign(href);
+}
+
+const systemLabels: Record<SystemId, { short: string; full: string }> = {
+  bazi: { short: "八字", full: "BaZi · 八字" },
+  ziwei: { short: "紫微", full: "Zi Wei · 紫微" },
+  astrology: { short: "占星", full: "Western Astrology · 西方占星" },
+};
+
+const navItems = [
+  { href: "/today", key: "today", zh: "今日", en: "Today", mark: "日" },
+  { href: "/life-map", key: "life-map", zh: "命盘", en: "Life Map", mark: "命" },
+  { href: "/ask", key: "ask", zh: "问", en: "Ask", mark: "问" },
+  { href: "/timing", key: "timing", zh: "时运", en: "Timing", mark: "时" },
+  { href: "/me", key: "me", zh: "我的", en: "Me", mark: "我" },
+];
+
+function BrandMark({ large = false }: { large?: boolean }) {
+  return (
+    <span className={`brand-mark ${large ? "brand-mark--large" : ""}`} aria-hidden="true">
+      <i /><i /><i /><i />
+    </span>
+  );
+}
+
+function PageShell({ route, title, eyebrow, children, backHref }: { route: RouteName; title?: string; eyebrow?: string; children: ReactNode; backHref?: string }) {
+  const hasNav = !["landing", "onboarding", "generating"].includes(route);
+  const activeKey = route === "domain" ? "life-map" : route === "insight" ? "today" : route === "objects" || route === "product" ? "me" : route;
+  return (
+    <div className={`app-shell ${hasNav ? "app-shell--nav" : ""}`}>
+      {hasNav && (
+        <header className="topbar">
+          <div className="topbar__inner">
+            {backHref ? <Link href={backHref} className="icon-link" aria-label="返回">←</Link> : <Link href="/today" className="wordmark"><BrandMark /><span>Life Map</span></Link>}
+            <div className="topbar__context">
+              {eyebrow && <span>{eyebrow}</span>}
+              {title && <strong>{title}</strong>}
+            </div>
+            <Link href="/me" className="profile-link" aria-label="个人资料">Y</Link>
+          </div>
+        </header>
+      )}
+      <main className={hasNav ? "main-content" : "main-content main-content--bare"}>{children}</main>
+      {hasNav && (
+        <nav className="bottom-nav" aria-label="主要导航">
+          <div className="bottom-nav__inner">
+            {navItems.map((item) => (
+              <Link key={item.key} href={item.href} className={activeKey === item.key ? "is-active" : ""} aria-current={activeKey === item.key ? "page" : undefined}>
+                <span className="nav-mark" aria-hidden="true">{item.mark}</span>
+                <span>{item.zh}</span>
+                <small>{item.en}</small>
+              </Link>
+            ))}
+          </div>
+        </nav>
+      )}
+    </div>
+  );
+}
+
+function SectionHeader({ eyebrow, title, action, href }: { eyebrow?: string; title: string; action?: string; href?: string }) {
+  return (
+    <div className="section-header">
+      <div>{eyebrow && <span className="eyebrow">{eyebrow}</span>}<h2>{title}</h2></div>
+      {action && href && <Link href={href} className="text-link">{action} <span aria-hidden="true">↗</span></Link>}
+    </div>
+  );
+}
+
+function EvidenceChip({ system, role }: { system: SystemId; role: "primary" | "supporting" | "context" }) {
+  return <span className={`evidence-chip evidence-chip--${role}`} aria-label={`${systemLabels[system].full}，${role === "primary" ? "主要依据" : role === "supporting" ? "支持依据" : "背景信息"}`}><i aria-hidden="true" />{systemLabels[system].short}</span>;
+}
+
+function EvidenceList({ evidence }: { evidence: EvidenceRef[] }) {
+  const resolved = resolveEvidence(evidence);
+  return (
+    <div className="evidence-list">
+      {resolved.map(({ fact, contribution, role }) => (
+        <details key={fact.id} className="evidence-row">
+          <summary>
+            <span className={`system-seal system-seal--${fact.system}`} aria-hidden="true">{systemLabels[fact.system].short.slice(0, 1)}</span>
+            <span><small>{systemLabels[fact.system].full}</small><strong>{fact.label}</strong></span>
+            <span className="evidence-role">{role === "primary" ? "主要" : role === "supporting" ? "支持" : "背景"}</span>
+          </summary>
+          <div className="evidence-row__body">
+            <div><span>命盘事实</span><p>{fact.rawLabel}</p></div>
+            <div><span>传统解释</span><p>{fact.traditionalInterpretation}</p></div>
+            <div><span>综合作用</span><p>{contribution}</p></div>
+            {fact.limitations && <p className="inline-notice">演示限制：{fact.limitations}</p>}
+          </div>
+        </details>
+      ))}
+    </div>
+  );
+}
+
+function ProductVisual({ product, compact = false }: { product: Product; compact?: boolean }) {
+  const style = { "--product-a": product.palette[0], "--product-b": product.palette[1], "--product-c": product.palette[2] } as React.CSSProperties;
+  return (
+    <div className={`product-visual ${compact ? "product-visual--compact" : ""}`} style={style} role="img" aria-label={`${product.nameZh}的抽象演示图`}>
+      <span className={`product-shape product-shape--${product.category}`} />
+      <i /><i /><i />
+      <small>DEMO OBJECT · 01</small>
+    </div>
+  );
+}
+
+function LandingPage() {
+  return (
+    <PageShell route="landing">
+      <div className="landing">
+        <header className="landing__header"><div className="wordmark"><BrandMark /><span>Life Map</span></div><button className="quiet-button" disabled>登录 · 即将开放</button></header>
+        <div className="landing__geometry" aria-hidden="true"><span className="orbit" /><span className="pillars" /><span className="broken-line" /></div>
+        <section className="landing__hero">
+          <p className="eyebrow">YOUR INNER ATLAS · 人生地图</p>
+          <h1>看见属于你的<br />人生地图</h1>
+          <p className="landing__lead">东方命理 × 西方占星 × AI，帮助你理解性格、关系与人生周期。</p>
+          <div className="landing__actions">
+            <Link href="/onboarding" className="button button--primary">生成我的命盘 <span aria-hidden="true">→</span></Link>
+            <a href="#principles" className="button button--tertiary">了解我们如何解释</a>
+          </div>
+          <p className="disclosure">基于传统解释体系的个人反思体验，不是科学预测或结果保证。</p>
+        </section>
+        <section id="principles" className="landing__principles" aria-label="产品原则">
+          <article><span>01</span><h2>三个体系</h2><p>把八字、紫微与西方占星放在同一张可理解的地图上。</p></article>
+          <article><span>02</span><h2>有据可循</h2><p>每个重要洞察都能展开查看来源、传统解释与综合判断。</p></article>
+          <article><span>03</span><h2>留有余地</h2><p>呈现主题、张力与反思提示，不用确定性语言替你做决定。</p></article>
+        </section>
+      </div>
+    </PageShell>
+  );
+}
+
+const onboardingSteps = [
+  { id: "name", number: "01", title: "怎么称呼你？", helper: "我们会用这个名字，让体验更自然。" },
+  { id: "date", number: "02", title: "你的出生日期", helper: "出生信息只用于生成这次演示体验。" },
+  { id: "time", number: "03", title: "你的出生时间", helper: "如果不知道准确时间，也可以继续。" },
+  { id: "location", number: "04", title: "你出生在哪里？", helper: "Phase 1 使用固定地点选项，不会调用真实地理服务。" },
+  { id: "rules", number: "05", title: "传统规则偏好", helper: "部分传统流派会使用此信息决定周期方向；本演示不会实际计算。" },
+  { id: "review", number: "06", title: "确认你的信息", helper: "完成后，我们会以固定演示数据展开你的 Life Map。" },
+];
+
+function OnboardingPage() {
+  const [step, setStep] = useState(0);
+  const [form, setForm] = useState({ name: "Yu", date: "1990-06-17", time: "09:32", unknownTime: false, location: "Shanghai, China", gender: "prefer-not-to-say", consent: false });
+  const current = onboardingSteps[step];
+
+  useEffect(() => {
+    const saved = sessionStorage.getItem("life-map-onboarding");
+    if (saved) queueMicrotask(() => setForm(JSON.parse(saved)));
+  }, []);
+
+  useEffect(() => { sessionStorage.setItem("life-map-onboarding", JSON.stringify(form)); }, [form]);
+
+  const valid = useMemo(() => {
+    if (current.id === "name") return form.name.trim().length > 0;
+    if (current.id === "date") return Boolean(form.date);
+    if (current.id === "time") return form.unknownTime || Boolean(form.time);
+    if (current.id === "location") return Boolean(form.location);
+    if (current.id === "review") return form.consent;
+    return true;
+  }, [current.id, form]);
+
+  const next = () => {
+    if (!valid) return;
+    if (step === onboardingSteps.length - 1) {
+      sessionStorage.setItem("life-map-complete", "true");
+      navigate("/generating");
+    } else setStep((value) => value + 1);
+  };
+
+  return (
+    <PageShell route="onboarding">
+      <div className="onboarding">
+        <header className="onboarding__header"><Link href="/" className="wordmark"><BrandMark /><span>Life Map</span></Link><span>创建你的地图</span></header>
+        <div className="progress-track" aria-label={`第 ${step + 1} 步，共 ${onboardingSteps.length} 步`}><i style={{ width: `${((step + 1) / onboardingSteps.length) * 100}%` }} /></div>
+        <section className="onboarding__panel">
+          <div className="step-count"><span>{current.number}</span><small>OF 06</small></div>
+          <p className="eyebrow">BIRTH PROFILE · 出生档案</p>
+          <h1>{current.title}</h1>
+          <p className="step-helper">{current.helper}</p>
+          <div className="step-fields">
+            {current.id === "name" && <label className="field"><span>偏好称呼</span><input autoFocus value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="输入你的名字" /></label>}
+            {current.id === "date" && <label className="field"><span>出生日期</span><input type="date" value={form.date} onChange={(event) => setForm({ ...form, date: event.target.value })} /></label>}
+            {current.id === "time" && <>
+              <label className="field"><span>当地时间</span><input type="time" value={form.time} disabled={form.unknownTime} onChange={(event) => setForm({ ...form, time: event.target.value })} /></label>
+              <label className="check-field"><input type="checkbox" checked={form.unknownTime} onChange={(event) => setForm({ ...form, unknownTime: event.target.checked })} /><span><strong>我不知道准确时间</strong><small>真实计算中，紫微宫位、上升与宫位可能因此不够精确。</small></span></label>
+            </>}
+            {current.id === "location" && <label className="field"><span>出生地点</span><select value={form.location} onChange={(event) => setForm({ ...form, location: event.target.value })}><option>Shanghai, China</option><option>Beijing, China</option><option>Taipei, Taiwan</option><option>Los Angeles, United States</option></select><small>已解析：31.2304° N · Asia/Shanghai（演示值）</small></label>}
+            {current.id === "rules" && <fieldset className="choice-field"><legend>传统规则输入（选填）</legend>{[["female", "女性"], ["male", "男性"], ["nonbinary", "非二元"], ["prefer-not-to-say", "不愿说明"]].map(([value, label]) => <label key={value}><input type="radio" name="gender" value={value} checked={form.gender === value} onChange={(event) => setForm({ ...form, gender: event.target.value })} /><span>{label}</span></label>)}</fieldset>}
+            {current.id === "review" && <div className="review-card">
+              <dl><div><dt>称呼</dt><dd>{form.name}</dd></div><div><dt>出生日期</dt><dd>{form.date}</dd></div><div><dt>出生时间</dt><dd>{form.unknownTime ? "未知" : form.time}</dd></div><div><dt>出生地点</dt><dd>{form.location}</dd></div></dl>
+              <label className="check-field"><input type="checkbox" checked={form.consent} onChange={(event) => setForm({ ...form, consent: event.target.checked })} /><span><strong>我理解这是演示体验</strong><small>命盘内容来自固定虚构数据，并非由出生信息真实计算。</small></span></label>
+            </div>}
+          </div>
+          <div className="onboarding__actions"><button className="button button--secondary" onClick={() => step === 0 ? navigate("/") : setStep((value) => value - 1)}>返回</button><button className="button button--primary" disabled={!valid} onClick={next}>{step === onboardingSteps.length - 1 ? "生成我的人生地图" : "继续"} <span aria-hidden="true">→</span></button></div>
+        </section>
+        <p className="onboarding__privacy">你的出生信息是敏感数据。本演示只保存在当前浏览器会话中。</p>
+      </div>
+    </PageShell>
+  );
+}
+
+const generationStages = ["正在校准出生时间", "正在排列四柱", "正在展开十二宫", "正在定位出生时的天空", "正在寻找共同主题"];
+
+function GeneratingPage() {
+  const [active, setActive] = useState(0);
+  const [done, setDone] = useState(false);
+  useEffect(() => {
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const interval = window.setInterval(() => setActive((value) => {
+      if (value >= generationStages.length - 1) { window.clearInterval(interval); setDone(true); return value; }
+      return value + 1;
+    }), reduced ? 180 : 620);
+    return () => window.clearInterval(interval);
+  }, []);
+  return (
+    <PageShell route="generating">
+      <div className="generation" aria-live="polite">
+        <div className="generation__art" aria-hidden="true"><span className="generation-orbit" /><span className="generation-grid" /><BrandMark large /></div>
+        <p className="eyebrow">CALIBRATING YOUR MAP</p>
+        <h1>{done ? "你的人生地图已生成" : generationStages[active]}</h1>
+        <p>{done ? "三个体系的演示线索已经汇入同一张地图。" : "我们正在把不同传统的结构化线索整理成清晰、可追溯的主题。"}</p>
+        <ol className="generation__stages">
+          {generationStages.map((stage, index) => <li key={stage} className={index < active || done ? "is-complete" : index === active ? "is-active" : ""}><span>{index < active || done ? "✓" : String(index + 1).padStart(2, "0")}</span>{stage}</li>)}
+        </ol>
+        {done ? <button className="button button--primary" onClick={() => navigate("/today")}>进入今日地图 <span aria-hidden="true">→</span></button> : <button className="text-button" onClick={() => { setActive(generationStages.length - 1); setDone(true); }}>跳过演示动画</button>}
+        <small className="fixture-label">DEMO FIXTURE · 未进行真实排盘</small>
+      </div>
+    </PageShell>
+  );
+}
+
+function TodayPage() {
+  const today = insights[0];
+  const featured = products[0];
+  return (
+    <PageShell route="today">
+      <div className="page today-page">
+        <header className="today-greeting"><div><span>Tuesday · Sep 1</span><h1>晚上好，Yu</h1></div><div className="day-seal" aria-hidden="true"><span>乙</span><small>WOOD</small></div></header>
+        <section className="today-hero">
+          <div className="today-hero__motif" aria-hidden="true"><i /><i /><i /></div>
+          <p className="eyebrow">{today.eyebrow} · TODAY&apos;S THEME</p>
+          <h2>{today.title}</h2>
+          <h3>{today.subtitle}</h3>
+          <p>{today.summary}</p>
+          <div className="evidence-chips">{today.evidence.map((item) => <EvidenceChip key={item.factId} system={item.system} role={item.role} />)}</div>
+          <Link href={`/insights/${today.id}`} className="button button--ink">为什么？查看依据 <span aria-hidden="true">↗</span></Link>
+        </section>
+        <section className="section-block">
+          <SectionHeader eyebrow="REFLECT" title="从一个问题开始" />
+          <div className="quick-grid">
+            <Link href="/ask" className="quick-card"><span className="quick-card__motif quick-card__motif--ask" aria-hidden="true" /><small>ASK MY CHART</small><h3>问命盘</h3><p>从三个体系寻找共同主题</p><b aria-hidden="true">→</b></Link>
+            <Link href="/iching" className="quick-card quick-card--cinnabar"><span className="quick-card__motif quick-card__motif--iching" aria-hidden="true" /><small>I CHING</small><h3>问一卦</h3><p>为此刻的具体问题留出空间</p><b aria-hidden="true">→</b></Link>
+          </div>
+        </section>
+        <section className="section-block"><SectionHeader eyebrow="YOUR PATTERNS" title="生命领域" action="查看全部" href="/life-map" /><div className="domain-grid domain-grid--today">{domains.slice(0, 4).map((domain, index) => <Link href={`/life-map/${domain.id}`} className="domain-card" key={domain.id}><span className="domain-card__index">0{index + 1}</span><small>{domain.nameEn}</small><h3>{domain.nameZh}</h3><p>{domain.pattern}</p><span className={`state state--${domain.state}`}>{domain.state === "active" ? "当前活跃" : domain.state === "steady" ? "稳定主题" : "值得反思"}</span></Link>)}</div></section>
+        <section className="timing-card">
+          <div><p className="eyebrow">CURRENT SEASON · 当前阶段</p><h2>{timing.title}</h2><p>{timing.summary}</p><Link href="/timing" className="text-link">展开时间线 <span aria-hidden="true">→</span></Link></div>
+          <div className="mini-timeline" aria-label={`当前阶段从 ${timing.start} 至 ${timing.end}`}><span>{timing.start}</span><div><i style={{ left: `${timing.nowPosition * 100}%` }}><b>现在</b></i></div><span>{timing.end}</span></div>
+        </section>
+        <section className="symbol-section">
+          <div className="element-symbol" aria-hidden="true"><span>木</span><i /><i /><i /></div>
+          <div><p className="eyebrow">TODAY&apos;S ELEMENT</p><h2>成长 · 扩张 · 柔韧</h2><p>今天不需要同时长出更多枝条；先选择一条值得持续培育的方向。</p><div className="practice"><span>今日练习</span><p>写下未来七天唯一愿意持续培育的小行动。</p></div></div>
+        </section>
+        <section className="section-block"><SectionHeader eyebrow="OPTIONAL OBJECT" title="与你的成长主题呼应" /><article className="recommendation-card"><ProductVisual product={featured} /><div className="recommendation-card__content"><div><span className="pill">WOOD · 新开始</span><h2>{featured.nameEn}</h2><h3>{featured.nameZh}</h3><p>{recommendation.summary}</p></div><div className="recommendation-card__footer"><span>{featured.price}</span><Link href={`/objects/${featured.slug}`} className="button button--secondary">为什么推荐给我？</Link></div></div></article></section>
+        <section className="recent-questions"><SectionHeader eyebrow="RECENT" title="最近想过的问题" /><Link href="/ask?prompt=我现在适合换工作吗？">我现在适合换工作吗？ <span>→</span></Link><Link href="/ask?prompt=为什么我做一段时间后就想开始新的事情？">为什么我做一段时间后就想开始新的事情？ <span>→</span></Link></section>
+      </div>
+    </PageShell>
+  );
+}
+
+function InsightPage({ id }: { id?: string }) {
+  const insight = getInsight(id ?? insights[0].id);
+  return (
+    <PageShell route="insight" title="为什么？" eyebrow="INSIGHT EVIDENCE" backHref="/today">
+      <div className="page reading-page">
+        <header className="reading-hero"><p className="eyebrow">{insight.eyebrow} · {insight.kind === "consensus" ? "MULTI-SYSTEM CONSENSUS" : "TENSION"}</p><h1>{insight.title}</h1><h2>{insight.subtitle}</h2><p>{insight.summary}</p><div className="evidence-chips">{insight.evidence.map((item) => <EvidenceChip key={item.factId} system={item.system} role={item.role} />)}</div></header>
+        <section className="reading-section"><span className="section-number">01</span><SectionHeader title="综合解释" eyebrow="SYNTHESIS" /><p className="reading-copy">{insight.kind === "consensus" ? "这一主题在两个以上体系中出现，但每个体系提供了不同角度。共同点不是结果预测，而是此刻值得观察的方向。" : "不同体系在这里保留了有意义的张力；我们不会把它们平均成一个分数。"}</p></section>
+        <section className="reading-section"><span className="section-number">02</span><SectionHeader title="依据来自哪里" eyebrow="EVIDENCE" /><EvidenceList evidence={insight.evidence} /></section>
+        {insight.tensionNote && <section className="tension-card"><p className="eyebrow">TENSION · 张力</p><h2>不需要急着消除的矛盾</h2><p>{insight.tensionNote}</p></section>}
+        <section className="reflection-card"><span aria-hidden="true">问</span><div><p className="eyebrow">REFLECTION PROMPT</p><h2>{insight.reflectionPrompt}</h2><Link href={`/ask?prompt=${encodeURIComponent(insight.reflectionPrompt)}`} className="button button--primary">和命盘继续聊 <span>→</span></Link></div></section>
+        <p className="disclosure disclosure--center">所有内容基于虚构演示数据，用于反思，不是科学预测。</p>
+      </div>
+    </PageShell>
+  );
+}
+
+function LifeMapPage() {
+  return (
+    <PageShell route="life-map">
+      <div className="page life-map-page">
+        <header className="map-hero"><div><p className="eyebrow">YOUR NATAL BLUEPRINT · 你的底图</p><h1>Builder<br /><i>×</i> Explorer</h1><p>你倾向于把模糊的想法变成可以运作的结构，同时需要持续发现新的可能。真正让你投入的，往往不是稳定本身，而是有空间参与定义方向。</p><div className="evidence-chips"><EvidenceChip system="bazi" role="primary" /><EvidenceChip system="ziwei" role="primary" /><EvidenceChip system="astrology" role="supporting" /></div></div><div className="map-diagram" aria-label="三个传统体系汇聚为 Life Map 的抽象图"><span className="map-ring" /><span className="map-grid" /><span className="map-pillars" /><b>命</b></div></header>
+        <div className="map-note"><span>如何阅读</span><p>这些领域不是命运评分，而是理解长期模式的入口。当前活跃表示本期内容的主题强调，不代表好或坏。</p></div>
+        <section className="section-block"><SectionHeader eyebrow="EIGHT DOMAINS" title="八个生命领域" /><div className="domain-grid domain-grid--all">{domains.map((domain, index) => <Link href={`/life-map/${domain.id}`} className="domain-card domain-card--wide" key={domain.id}><span className="domain-card__index">{String(index + 1).padStart(2, "0")}</span><div><small>{domain.nameEn}</small><h3>{domain.nameZh}</h3></div><p>{domain.pattern}</p><span className={`state state--${domain.state}`}>{domain.state === "active" ? "当前活跃" : domain.state === "steady" ? "稳定主题" : domain.state === "emerging" ? "正在浮现" : "值得反思"}</span><b aria-hidden="true">↗</b></Link>)}</div></section>
+      </div>
+    </PageShell>
+  );
+}
+
+function DomainPage({ id }: { id?: string }) {
+  const domain = getDomain(id ?? "career");
+  const insight = getInsight(domain.insightId);
+  const dimensions = domain.dimensions ?? [
+    { label: "内在驱动", qualitativeValue: "high" as const, internalValue: 0.78 },
+    { label: "关系感受", qualitativeValue: "medium" as const, internalValue: 0.56 },
+    { label: "当前强调", qualitativeValue: "high" as const, internalValue: 0.72 },
+  ];
+  return (
+    <PageShell route="domain" title={`${domain.nameZh} / ${domain.nameEn}`} eyebrow="LIFE DOMAIN" backHref="/life-map">
+      <div className="page domain-page">
+        <header className="domain-hero"><p className="eyebrow">{domain.nameEn.toUpperCase()} PATTERN</p><h1>{domain.pattern}</h1><h2>{insight.subtitle}</h2><p>{insight.summary}</p></header>
+        <section className="dimensions-card"><div><p className="eyebrow">QUALITATIVE DIMENSIONS</p><h2>你的模式侧重</h2><p>以下为解释性标签，不是科学测量或命运评分。</p></div><div className="dimension-list">{dimensions.map((dimension) => <div key={dimension.label}><span><b>{dimension.label}</b><small>{dimension.qualitativeValue === "very-high" ? "很突出" : dimension.qualitativeValue === "high" ? "较突出" : "适中"}</small></span><i><b style={{ width: `${dimension.internalValue * 100}%` }} /></i></div>)}</div></section>
+        <section className="reading-section"><SectionHeader eyebrow="MULTI-SYSTEM READING" title="三个体系如何描述它" /><p className="reading-copy">这不是把三个传统相加成一个结论，而是让每条线索保留自己的来源与语言，再观察它们在哪里相遇。</p><EvidenceList evidence={insight.evidence} /></section>
+        {insight.tensionNote && <section className="tension-card"><p className="eyebrow">A USEFUL TENSION</p><h2>值得保留的张力</h2><p>{insight.tensionNote}</p></section>}
+        <section className="reflection-card"><span aria-hidden="true">问</span><div><p className="eyebrow">TAKE THIS WITH YOU</p><h2>{insight.reflectionPrompt}</h2><Link href={`/ask?prompt=${encodeURIComponent(insight.reflectionPrompt)}`} className="button button--primary">问一个{domain.nameZh}问题 <span>→</span></Link></div></section>
+      </div>
+    </PageShell>
+  );
+}
+
+function AskPage() {
+  const [input, setInput] = useState("");
+  const [answer, setAnswer] = useState<AskResponse | null>(null);
+  useEffect(() => {
+    const prompt = new URLSearchParams(window.location.search).get("prompt");
+    if (prompt) queueMicrotask(() => { setInput(prompt); setAnswer(routeAsk(prompt)); });
+  }, []);
+  const submit = (event: FormEvent) => { event.preventDefault(); if (input.trim()) setAnswer(routeAsk(input)); };
+  return (
+    <PageShell route="ask">
+      <div className={`page ask-page ${answer ? "ask-page--answered" : ""}`}>
+        {!answer ? <>
+          <header className="ask-hero"><div className="ask-orbit" aria-hidden="true"><span>问</span></div><p className="eyebrow">ASK MY CHART · 问命盘</p><h1>你最近在想什么？</h1><p>我会从固定的演示命盘事实中寻找共识、张力和不同角度，并让每个回答都能展开查看依据。</p><span className="fixture-label">DEMO · 不会调用实时 AI</span></header>
+          <section className="suggestions"><p className="eyebrow">SUGGESTED QUESTIONS</p>{askResponses.slice(0, 4).map((response, index) => <button key={response.id} onClick={() => { setInput(response.suggestedPrompt); setAnswer(response); }}><span>0{index + 1}</span>{response.suggestedPrompt}<b>→</b></button>)}</section>
+        </> : <AskAnswer answer={answer} question={input} onReset={() => { setAnswer(null); setInput(""); }} />}
+        <form className="chat-composer" onSubmit={submit}><label htmlFor="chart-question" className="sr-only">输入你想问命盘的问题</label><textarea id="chart-question" value={input} onChange={(event) => setInput(event.target.value)} placeholder="写下一个具体的问题…" rows={1} /><button type="submit" aria-label="发送问题" disabled={!input.trim()}>↑</button><small>固定演示回答 · 不替代专业建议</small></form>
+      </div>
+    </PageShell>
+  );
+}
+
+function AskAnswer({ answer, question, onReset }: { answer: AskResponse; question: string; onReset: () => void }) {
+  return (
+    <article className="answer">
+      <header><button className="text-button" onClick={onReset}>← 新问题</button><p className="eyebrow">YOUR QUESTION</p><blockquote>{question}</blockquote><span className="kind-label">{answer.kind === "consensus" ? "多体系共识" : answer.kind === "tension" ? "有意义的张力" : "独立线索"}</span><h1>{answer.title}</h1><p>{answer.directAnswer}</p></header>
+      {answer.sections.map((section, index) => <section className="answer-section" key={section.heading}><span>0{index + 1}</span><div><h2>{section.heading}</h2><p>{section.body}</p><EvidenceList evidence={section.evidence} /></div></section>)}
+      <section className="answer-reflection"><p className="eyebrow">A QUESTION TO KEEP</p><h2>{answer.reflectionQuestion}</h2></section>
+      {answer.relatedDomain && <Link href={`/life-map/${answer.relatedDomain}`} className="button button--secondary">查看相关生命领域 <span>↗</span></Link>}
+      <p className="disclosure">{answer.disclaimer}</p>
+    </article>
+  );
+}
+
+function Hexagram({ lines, count = 6 }: { lines: IChingLine[]; count?: number }) {
+  return <div className="hexagram" aria-label={`六爻卦象，已显示 ${count} 爻`}>{lines.slice(0, count).reverse().map((line) => <div key={line.position} className={`hex-line hex-line--${line.polarity} ${line.moving ? "is-moving" : ""}`}><span /><span />{line.moving && <b>○</b>}<small>{line.position}</small></div>)}</div>;
+}
+
+function IChingPage() {
+  const [question, setQuestion] = useState(iching.sampleQuestion);
+  const [started, setStarted] = useState(false);
+  const [casts, setCasts] = useState(0);
+  const cast = () => { setStarted(true); setCasts((value) => Math.min(6, value + 1)); };
+  const reset = () => { setCasts(0); setStarted(false); };
+  return (
+    <PageShell route="iching" title="问一卦 / I Ching" eyebrow="REFLECTION RITUAL" backHref="/ask">
+      <div className="page iching-page">
+        {!started ? <section className="iching-intro"><div className="iching-mark" aria-hidden="true"><i /><i /><i /><i /><i /><i /></div><p className="eyebrow">A QUESTION FOR THIS MOMENT</p><h1>先把问题<br />放在心里</h1><p>易经在这里是一种为具体问题留出空间的传统反思实践。它不会替你预测或保证结果。</p><label className="field field--textarea"><span>你想问什么？</span><textarea value={question} onChange={(event) => setQuestion(event.target.value)} rows={3} /></label><button className="button button--primary" disabled={!question.trim()} onClick={cast}>开始投掷 <span>→</span></button></section> : casts < 6 ? <section className="casting"><p className="eyebrow">BUILDING FROM THE BOTTOM · 从下往上</p><h1>第 {casts + 1} 次，共 6 次</h1><p className="casting__question">“{question}”</p><div className="cast-stage"><Hexagram lines={iching.lines} count={casts} /><div className="coins" aria-hidden="true"><span>阴</span><span>阳</span><span>阴</span></div></div><button className="button button--primary" onClick={cast}>投掷三枚硬币</button><button className="text-button" onClick={() => setCasts(6)}>直接查看演示结果</button></section> : <section className="iching-result"><header><div><p className="eyebrow">HEXAGRAM 63 · 演示结果</p><h1>{iching.primary.nameZh}</h1><h2>{iching.primary.nameEn}</h2></div><Hexagram lines={iching.lines} /></header><div className="result-transition"><span>{iching.primary.nameZh} · 63</span><i>六二动爻 →</i><span>{iching.relating?.nameZh} · 05</span></div><section><p className="eyebrow">ORIGINAL TEXT · {iching.originalTextLabel}</p><blockquote>{iching.originalTextExcerpt}</blockquote></section><section><p className="eyebrow">PLAIN LANGUAGE · 白话理解</p><h2>已经开始，不必急着补齐一切</h2><p>{iching.plainLanguage}</p></section><section className="application-card"><p className="eyebrow">APPLIED TO YOUR QUESTION</p><h2>放回你的问题里</h2><p>{iching.applicationToQuestion}</p></section><section className="answer-reflection"><p className="eyebrow">REFLECTION</p><h2>{iching.reflectionPrompt}</h2></section><div className="result-actions"><Link href={`/ask?prompt=${encodeURIComponent(`结合命盘看：${question}`)}`} className="button button--primary">结合我的命盘一起看</Link><button className="button button--secondary" onClick={reset}>重新起卦</button></div><p className="disclosure disclosure--center">{iching.disclaimer}</p></section>}
+      </div>
+    </PageShell>
+  );
+}
+
+function TimingPage() {
+  return (
+    <PageShell route="timing">
+      <div className="page timing-page">
+        <header className="page-heading"><p className="eyebrow">YOUR CURRENT SEASON · 当前时运</p><h1>{timing.title}</h1><p>{timing.summary}</p></header>
+        <section className="timeline-large"><div className="timeline-years"><span>过去</span><span>现在</span><span>近期</span></div><div className="timeline-track"><i style={{ left: `${timing.nowPosition * 100}%` }}><b>NOW</b></i></div><div className="timeline-periods"><article><small>2026.01—06</small><h3>旧结构松动</h3><p>观察什么正在失去意义。</p></article><article className="is-current"><small>{timing.start}—{timing.end}</small><h3>{timing.title}</h3><p>{timing.summary}</p></article><article><small>{timing.nextTransition.date}</small><h3>{timing.nextTransition.title}</h3><p>{timing.nextTransition.summary}</p></article></div></section>
+        <section className="section-block"><SectionHeader eyebrow="DOMAIN ACTIVATION" title="哪些主题正在被强调" /><div className="signal-list">{timing.signals.map((signal) => <article key={signal.id}><div><span>{signal.label}</span><small>{signal.strength === "very-active" ? "很活跃" : signal.strength === "active" ? "活跃" : "出现中"}</small></div><i><b style={{ width: `${signal.internalStrength * 100}%` }} /></i><p>{signal.summary}</p></article>)}</div><p className="inline-notice">{timing.disclaimer}</p></section>
+        <section className="reflection-card"><span aria-hidden="true">时</span><div><p className="eyebrow">THIS SEASON&apos;S PRACTICE</p><h2>为一个真正值得的承诺留出结构</h2><Link href="/ask?prompt=这个阶段我最值得保留什么承诺？" className="button button--primary">围绕当前阶段提问</Link></div></section>
+      </div>
+    </PageShell>
+  );
+}
+
+function ObjectsPage() {
+  return (
+    <PageShell route="objects" title="象征物 / Objects" eyebrow="OPTIONAL RITUALS" backHref="/me">
+      <div className="page objects-page"><header className="page-heading"><p className="eyebrow">OBJECTS WITH CONTEXT</p><h1>把一个主题<br />带进日常</h1><p>这些物品是可选的象征提醒，不是补救、保护或改变命运的工具。每个推荐都先提供一个不需要购买的日常练习。</p></header><div className="product-grid">{products.map((product) => <Link href={`/objects/${product.slug}`} key={product.id} className="product-card"><ProductVisual product={product} compact /><div><small>{product.category.replace("-", " ")}</small><h2>{product.nameEn}</h2><h3>{product.nameZh}</h3><p>{product.shortDescription}</p><span>{product.price}</span></div></Link>)}</div></div>
+    </PageShell>
+  );
+}
+
+function ProductPage({ id }: { id?: string }) {
+  const product = getProduct(id ?? products[0].slug);
+  const isFeatured = product.id === recommendation.productId;
+  return (
+    <PageShell route="product" title="象征物详情" eyebrow="OBJECT DETAIL" backHref="/objects">
+      <div className="page product-page"><div className="product-layout"><div className="product-gallery"><ProductVisual product={product} /><div className="gallery-thumbs"><button aria-label="查看主图" className="is-active"><span /></button><button aria-label="查看材质细节"><span /></button><button aria-label="查看日常使用情境"><span /></button></div></div><article className="product-detail"><p className="eyebrow">PERSONAL SYMBOL · OPTIONAL</p><h1>{product.nameEn}</h1><h2>{product.nameZh}</h2><p className="product-intro">{product.shortDescription}</p>{isFeatured && <><section className="why-section"><p className="eyebrow">WHY IT SHOWED UP FOR YOU</p><h3>{recommendation.headline}</h3><p>{recommendation.summary}</p><div className="reason-list">{recommendation.reasons.map((reason) => <article key={reason.id}><span>{reason.label}</span><p>{reason.explanation}</p></article>)}</div></section><section className="practice practice--large"><span>{recommendation.nonCommercialPractice.title}</span><p>{recommendation.nonCommercialPractice.instruction}</p></section></>}<section className="association"><p className="eyebrow">TRADITIONAL ASSOCIATION</p><p>{product.traditionalMeaning}</p><div className="pill-row">{product.elements.concat(product.intentions).map((item) => <span className="pill" key={item}>{item}</span>)}</div></section><section className="daily-use"><p className="eyebrow">A SIMPLE DAILY USE</p><h3>让它成为一个动作提示</h3><p>{product.dailyUse}</p></section><details className="product-info" open><summary>材质与信息</summary><dl><div><dt>材质</dt><dd>{product.material}</dd></div><div><dt>产地</dt><dd>{product.origin}</dd></div><div><dt>尺寸</dt><dd>{product.dimensions}</dd></div><div><dt>养护</dt><dd>{product.care}</dd></div></dl></details><div className="product-action"><div><small>演示价格</small><strong>{product.price}</strong></div><button className="button button--primary">加入愿望清单</button></div><p className="disclosure">{isFeatured ? recommendation.disclaimer : "这些关联来自传统及现代象征文化，不是科学功效或结果保证。"} Phase 1 不提供购买。</p></article></div></div>
+    </PageShell>
+  );
+}
+
+function MePage() {
+  return (
+    <PageShell route="me">
+      <div className="page me-page"><header className="profile-hero"><div className="profile-monogram">Y</div><div><p className="eyebrow">DEMO PROFILE</p><h1>Yu</h1><p>你的 Life Map 演示档案</p></div></header><section className="profile-card"><SectionHeader eyebrow="BIRTH PROFILE" title="出生信息" /><dl><div><dt>出生日期</dt><dd>{demoProfile.birthDate}</dd></div><div><dt>出生时间</dt><dd>{demoProfile.birthTime}</dd></div><div><dt>出生地点</dt><dd>{demoProfile.birthLocation}</dd></div><div><dt>状态</dt><dd><span className="fixture-label">DEMO FIXTURE</span></dd></div></dl><Link href="/onboarding" className="text-link">重新体验引导 →</Link></section><section className="menu-list"><Link href="/objects"><span>象征物收藏</span><small>查看所有演示物品</small><b>→</b></Link><button disabled><span>关系档案</span><small>后续阶段开放</small><b>即将开放</b></button><button disabled><span>通知与每日提醒</span><small>后续阶段开放</small><b>即将开放</b></button></section><section className="trust-card"><p className="eyebrow">TRUST & PRIVACY</p><h2>你的信息，应该被谨慎对待</h2><p>出生信息和关系档案属于敏感个人数据。本阶段不使用账户或云端存储，也不会发送分析事件。</p><ul><li>演示内容并非真实排盘</li><li>没有实时 AI、支付或追踪</li><li>解释传统仅用于个人反思</li></ul></section></div>
+    </PageShell>
+  );
+}
+
+export function LifeMapApp({ initialRoute, resourceId }: { initialRoute: RouteName; resourceId?: string }) {
+  switch (initialRoute) {
+    case "landing": return <LandingPage />;
+    case "onboarding": return <OnboardingPage />;
+    case "generating": return <GeneratingPage />;
+    case "today": return <TodayPage />;
+    case "insight": return <InsightPage id={resourceId} />;
+    case "life-map": return <LifeMapPage />;
+    case "domain": return <DomainPage id={resourceId} />;
+    case "ask": return <AskPage />;
+    case "iching": return <IChingPage />;
+    case "timing": return <TimingPage />;
+    case "objects": return <ObjectsPage />;
+    case "product": return <ProductPage id={resourceId} />;
+    case "me": return <MePage />;
+  }
+}
