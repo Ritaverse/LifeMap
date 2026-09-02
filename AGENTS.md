@@ -28,18 +28,19 @@ Before making implementation decisions, read these files in order:
 3. `DESIGN_SYSTEM.md`
 4. `MVP_PLAN.md`
 5. `MOCK_DATA.md`
+6. `PHASE_2_PLAN.md`
 
-Treat these documents as the source of truth for Phase 1. If implementation code exists, inspect it before proposing structural changes. Preserve unrelated user work.
+Treat these documents as the product source of truth. If implementation code exists, inspect it before proposing structural changes. Preserve unrelated user work.
 
 ## Current Phase
 
-Phase 1 is a **high-fidelity, clickable prototype backed by realistic mock data**.
+Phase 2A is the active slice: **deterministic BaZi calculation foundations** layered onto the validated Phase 1 experience.
 
-Build this vertical flow:
+The current vertical slice is:
 
-> Birth onboarding → chart-generation animation → Today → Life Map → Ask My Chart / I Ching → personalized recommendation → Product Detail
+> Birth onboarding → normalized local birth profile → versioned BaZi engine → structured Four Pillars facts → clearly separated demo interpretation
 
-Do not implement real BaZi, Zi Wei, ephemeris, transit, calendar, geocoding, timezone-history, payment, authentication, or LLM services in Phase 1. Establish interfaces that can accept those services later.
+Real BaZi calculation is authorized in Phase 2A. Keep Zi Wei, Western ephemeris/transits, live AI, geocoding, timezone-history, payments, and authentication out of this slice. Do not present Phase 1 fixture interpretations as conclusions derived from a newly calculated chart.
 
 ## Working Priorities
 
@@ -188,6 +189,17 @@ Git history is not available in this scaffold. Use concise Conventional Commit-s
 ## Security & Configuration
 
 Never commit secrets or personal data. Store local values in ignored `.env` files and provide a safe `.env.example` containing names and placeholders only. Validate external input and review new dependencies before adoption. Phase 1 must contain no production credentials, analytics, payment, real chart, or live AI integrations.
+
+## Definition of Done for Phase 2A
+
+Phase 2A is complete only when:
+
+- Supported birth inputs produce deterministic, versioned Four Pillars output.
+- Unknown birth time omits the time pillar and exposes boundary limitations.
+- Calculation rules and engine version are visible to the user.
+- Calculated facts remain visually and structurally separate from fixture interpretation.
+- Sensitive inputs stay in the current browser session and can be cleared.
+- Known-result, boundary, invalid-input, type, lint, route, and build checks pass.
 
 ## Definition of Done for Phase 1
 

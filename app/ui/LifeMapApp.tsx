@@ -2,7 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { AnchorHTMLAttributes, FormEvent, ReactNode } from "react";
-import { askResponses, demoProfile, domains, iching, insights, products, recommendation, timing } from "../lib/data";
+import { askResponses, domains, iching, insights, products, recommendation, timing } from "../lib/data";
+import { birthPlaces, calculateBazi, demoBaziReading, demoBirthProfile, getBirthPlace } from "../lib/bazi";
+import type { BaziReading, FiveElement } from "../lib/bazi";
+import { clearBirthProfile, readBirthProfile, readOnboardingDraft, writeBirthProfile, writeOnboardingDraft } from "../lib/profile-storage";
+import type { OnboardingDraft } from "../lib/profile-storage";
 import { getInsight, resolveEvidence, routeAsk } from "../lib/repository";
 import type { AskResponse, EvidenceRef, IChingLine, Product, SystemId } from "../lib/types";
 
@@ -79,6 +83,68 @@ function SectionHeader({ eyebrow, title, action, href }: { eyebrow?: string; tit
       <div>{eyebrow && <span className="eyebrow">{eyebrow}</span>}<h2>{title}</h2></div>
       {action && href && <Link href={href} className="text-link">{action} <span aria-hidden="true">↗</span></Link>}
     </div>
+  );
+}
+
+function useActiveBaziReading() {
+  const [reading, setReading] = useState<BaziReading>(demoBaziReading);
+  useEffect(() => {
+    const profile = readBirthProfile();
+    if (!profile) return;
+    try {
+      const nextReading = calculateBazi(profile);
+      queueMicrotask(() => setReading(nextReading));
+    } catch { /* Keep the safe fictional sample if stored data is invalid. */ }
+  }, []);
+  return reading;
+}
+
+const elementEnglish: Record<FiveElement, string> = { 木: "WOOD", 火: "FIRE", 土: "EARTH", 金: "METAL", 水: "WATER" };
+
+function PhaseScopeNotice() {
+  return (
+    <aside className="phase-scope" aria-label="当前计算范围">
+      <span>PHASE 2A</span>
+      <p><strong>八字四柱已启用真实计算。</strong> 紫微、西占、时运与综合洞察目前仍是固定演示内容，不会混作你的真实结果。</p>
+    </aside>
+  );
+}
+
+function BaziChartCard({ reading, id }: { reading: BaziReading; id?: string }) {
+  const pillars = [reading.pillars.year, reading.pillars.month, reading.pillars.day, reading.pillars.time];
+  return (
+    <section className="bazi-chart" id={id}>
+      <header className="bazi-chart__header">
+        <div><p className="eyebrow">DETERMINISTIC CHART FACTS · 确定性命盘事实</p><h2>你的四柱</h2><p>依据你输入的当地出生时间与所列规则计算；这里展示结构化事实，不生成性格或吉凶结论。</p></div>
+        <span className="calculation-label">CALCULATED · v{reading.engine.version}</span>
+      </header>
+      <div className="bazi-pillars" aria-label="八字四柱">
+        {pillars.map((pillar, index) => pillar ? (
+          <article key={pillar.kind} className={pillar.kind === "day" ? "is-day" : ""}>
+            <small>{pillar.label}</small>
+            <div aria-label={`${pillar.label} ${pillar.ganZhi}`}><strong>{pillar.stem}</strong><strong>{pillar.branch}</strong></div>
+            <span>{pillar.elements.join(" · ")}</span>
+            <p>{pillar.stemTenGod} · 纳音 {pillar.naYin}</p>
+          </article>
+        ) : (
+          <article key={`missing-${index}`} className="is-missing">
+            <small>时柱</small><div><strong>—</strong><strong>—</strong></div><span>出生时间未知</span><p>暂不推算</p>
+          </article>
+        ))}
+      </div>
+      <div className="bazi-chart__summary">
+        <div><span>日主</span><strong>{reading.dayMaster.stem} · {reading.dayMaster.polarity}{reading.dayMaster.element}</strong><small>{elementEnglish[reading.dayMaster.element]}</small></div>
+        <div><span>农历日期</span><strong>{reading.lunarDate}</strong><small>{reading.place.timeZone}</small></div>
+      </div>
+      <div className="element-counts" aria-label="表层干支五行数量">
+        {(Object.entries(reading.visibleElementCounts) as Array<[FiveElement, number]>).map(([element, count]) => <span key={element}><b>{element}</b>{count}</span>)}
+      </div>
+      <details className="calculation-details">
+        <summary>查看计算规则与限制</summary>
+        <dl><div><dt>年界</dt><dd>立春</dd></div><div><dt>月界</dt><dd>节气中的「节」</dd></div><div><dt>日界</dt><dd>当地民用时间 00:00</dd></div><div><dt>真太阳时</dt><dd>本阶段未校正</dd></div></dl>
+        {reading.caveats.map((caveat) => <p key={caveat}>{caveat}</p>)}
+      </details>
+    </section>
   );
 }
 
@@ -162,30 +228,41 @@ function LandingPage() {
 
 const onboardingSteps = [
   { id: "name", number: "01", title: "怎么称呼你？", helper: "我们会用这个名字，让体验更自然。" },
-  { id: "date", number: "02", title: "你的出生日期", helper: "出生信息只用于生成这次演示体验。" },
-  { id: "time", number: "03", title: "你的出生时间", helper: "如果不知道准确时间，也可以继续。" },
-  { id: "location", number: "04", title: "你出生在哪里？", helper: "Phase 1 使用固定地点选项，不会调用真实地理服务。" },
-  { id: "rules", number: "05", title: "传统规则偏好", helper: "部分传统流派会使用此信息决定周期方向；本演示不会实际计算。" },
-  { id: "review", number: "06", title: "确认你的信息", helper: "完成后，我们会以固定演示数据展开你的 Life Map。" },
+  { id: "date", number: "02", title: "你的出生日期", helper: "日期会进入真实八字四柱计算。" },
+  { id: "time", number: "03", title: "你的出生时间", helper: "当地时间用于确定时柱；不知道时可以生成暂缺时柱的结果。" },
+  { id: "location", number: "04", title: "你出生在哪里？", helper: "首个计算版本支持四个已校验的地点与时区。" },
+  { id: "rules", number: "05", title: "传统规则输入", helper: "本轮先记录此项；后续运势与紫微引擎才会使用。" },
+  { id: "review", number: "06", title: "确认计算范围", helper: "八字将真实计算；紫微、西占和综合解释仍使用演示内容。" },
 ];
+
+const defaultOnboardingDraft: OnboardingDraft = {
+  name: demoBirthProfile.displayName,
+  date: demoBirthProfile.birthDate,
+  time: demoBirthProfile.birthTime ?? "12:00",
+  unknownTime: false,
+  locationId: demoBirthProfile.placeId,
+  gender: demoBirthProfile.traditionalGender,
+  consent: false,
+};
 
 function OnboardingPage() {
   const [step, setStep] = useState(0);
-  const [form, setForm] = useState({ name: "Yu", date: "1990-06-17", time: "09:32", unknownTime: false, location: "Shanghai, China", gender: "prefer-not-to-say", consent: false });
+  const [form, setForm] = useState<OnboardingDraft>(defaultOnboardingDraft);
+  const [error, setError] = useState("");
   const current = onboardingSteps[step];
+  const selectedPlace = getBirthPlace(form.locationId);
 
   useEffect(() => {
-    const saved = sessionStorage.getItem("life-map-onboarding");
-    if (saved) queueMicrotask(() => setForm(JSON.parse(saved)));
+    queueMicrotask(() => setForm(readOnboardingDraft(defaultOnboardingDraft)));
   }, []);
 
-  useEffect(() => { sessionStorage.setItem("life-map-onboarding", JSON.stringify(form)); }, [form]);
+  useEffect(() => { writeOnboardingDraft(form); }, [form]);
 
   const valid = useMemo(() => {
     if (current.id === "name") return form.name.trim().length > 0;
     if (current.id === "date") return Boolean(form.date);
     if (current.id === "time") return form.unknownTime || Boolean(form.time);
-    if (current.id === "location") return Boolean(form.location);
+    if (current.id === "location") return Boolean(form.locationId);
     if (current.id === "review") return form.consent;
     return true;
   }, [current.id, form]);
@@ -193,8 +270,22 @@ function OnboardingPage() {
   const next = () => {
     if (!valid) return;
     if (step === onboardingSteps.length - 1) {
-      sessionStorage.setItem("life-map-complete", "true");
-      navigate("/generating");
+      try {
+        const profile = {
+          displayName: form.name,
+          birthDate: form.date,
+          birthTime: form.unknownTime ? null : form.time,
+          timeAccuracy: form.unknownTime ? "unknown" as const : "known" as const,
+          placeId: form.locationId,
+          traditionalGender: form.gender,
+        };
+        calculateBazi(profile);
+        writeBirthProfile(profile);
+        sessionStorage.setItem("life-map-complete", "true");
+        navigate("/generating");
+      } catch {
+        setError("这组出生资料暂时无法计算，请返回检查日期、时间和地点。");
+      }
     } else setStep((value) => value + 1);
   };
 
@@ -210,29 +301,31 @@ function OnboardingPage() {
           <p className="step-helper">{current.helper}</p>
           <div className="step-fields">
             {current.id === "name" && <label className="field"><span>偏好称呼</span><input autoFocus value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="输入你的名字" /></label>}
-            {current.id === "date" && <label className="field"><span>出生日期</span><input type="date" value={form.date} onChange={(event) => setForm({ ...form, date: event.target.value })} /></label>}
+            {current.id === "date" && <label className="field"><span>出生日期</span><input type="date" min="1900-01-01" max="2100-12-31" value={form.date} onChange={(event) => setForm({ ...form, date: event.target.value })} /><small>当前引擎支持 1900—2100 年的公历输入。</small></label>}
             {current.id === "time" && <>
               <label className="field"><span>当地时间</span><input type="time" value={form.time} disabled={form.unknownTime} onChange={(event) => setForm({ ...form, time: event.target.value })} /></label>
-              <label className="check-field"><input type="checkbox" checked={form.unknownTime} onChange={(event) => setForm({ ...form, unknownTime: event.target.checked })} /><span><strong>我不知道准确时间</strong><small>真实计算中，紫微宫位、上升与宫位可能因此不够精确。</small></span></label>
+              <label className="check-field"><input type="checkbox" checked={form.unknownTime} onChange={(event) => setForm({ ...form, unknownTime: event.target.checked })} /><span><strong>我不知道准确时间</strong><small>本阶段会省略八字时柱；未来紫微宫位与西占上升也会标记为不确定。</small></span></label>
             </>}
-            {current.id === "location" && <label className="field"><span>出生地点</span><select value={form.location} onChange={(event) => setForm({ ...form, location: event.target.value })}><option>Shanghai, China</option><option>Beijing, China</option><option>Taipei, Taiwan</option><option>Los Angeles, United States</option></select><small>已解析：31.2304° N · Asia/Shanghai（演示值）</small></label>}
-            {current.id === "rules" && <fieldset className="choice-field"><legend>传统规则输入（选填）</legend>{[["female", "女性"], ["male", "男性"], ["nonbinary", "非二元"], ["prefer-not-to-say", "不愿说明"]].map(([value, label]) => <label key={value}><input type="radio" name="gender" value={value} checked={form.gender === value} onChange={(event) => setForm({ ...form, gender: event.target.value })} /><span>{label}</span></label>)}</fieldset>}
+            {current.id === "location" && <label className="field"><span>出生地点</span><select value={form.locationId} onChange={(event) => setForm({ ...form, locationId: event.target.value as OnboardingDraft["locationId"] })}>{birthPlaces.map((place) => <option key={place.id} value={place.id}>{place.label}</option>)}</select><small>已解析：{Math.abs(selectedPlace.latitude).toFixed(4)}° {selectedPlace.latitude >= 0 ? "N" : "S"} · {selectedPlace.timeZone}</small></label>}
+            {current.id === "rules" && <fieldset className="choice-field"><legend>传统规则输入（选填）</legend>{[["female", "女性"], ["male", "男性"], ["nonbinary", "非二元"], ["prefer-not-to-say", "不愿说明"]].map(([value, label]) => <label key={value}><input type="radio" name="gender" value={value} checked={form.gender === value} onChange={(event) => setForm({ ...form, gender: event.target.value as OnboardingDraft["gender"] })} /><span>{label}</span></label>)}</fieldset>}
             {current.id === "review" && <div className="review-card">
-              <dl><div><dt>称呼</dt><dd>{form.name}</dd></div><div><dt>出生日期</dt><dd>{form.date}</dd></div><div><dt>出生时间</dt><dd>{form.unknownTime ? "未知" : form.time}</dd></div><div><dt>出生地点</dt><dd>{form.location}</dd></div></dl>
-              <label className="check-field"><input type="checkbox" checked={form.consent} onChange={(event) => setForm({ ...form, consent: event.target.checked })} /><span><strong>我理解这是演示体验</strong><small>命盘内容来自固定虚构数据，并非由出生信息真实计算。</small></span></label>
+              <dl><div><dt>称呼</dt><dd>{form.name}</dd></div><div><dt>出生日期</dt><dd>{form.date}</dd></div><div><dt>出生时间</dt><dd>{form.unknownTime ? "未知（不计算时柱）" : form.time}</dd></div><div><dt>出生地点</dt><dd>{selectedPlace.label}</dd></div><div><dt>时区</dt><dd>{selectedPlace.timeZone}</dd></div></dl>
+              <label className="check-field"><input type="checkbox" checked={form.consent} onChange={(event) => setForm({ ...form, consent: event.target.checked })} /><span><strong>我理解当前的计算范围</strong><small>八字四柱会真实计算；紫微、西占、时运与综合解释仍是固定演示，不代表我的个人结果。</small></span></label>
             </div>}
           </div>
+          {error && <p className="inline-notice" role="alert">{error}</p>}
           <div className="onboarding__actions"><button className="button button--secondary" onClick={() => step === 0 ? navigate("/") : setStep((value) => value - 1)}>返回</button><button className="button button--primary" disabled={!valid} onClick={next}>{step === onboardingSteps.length - 1 ? "生成我的人生地图" : "继续"} <span aria-hidden="true">→</span></button></div>
         </section>
-        <p className="onboarding__privacy">你的出生信息是敏感数据。本演示只保存在当前浏览器会话中。</p>
+        <p className="onboarding__privacy">你的出生信息是敏感数据。本次计算只保存在当前浏览器会话中。</p>
       </div>
     </PageShell>
   );
 }
 
-const generationStages = ["正在校准出生时间", "正在排列四柱", "正在展开十二宫", "正在定位出生时的天空", "正在寻找共同主题"];
+const generationStages = ["正在验证出生资料", "正在按节气排列年柱与月柱", "正在计算日柱与时柱", "正在记录计算约定", "正在载入演示综合解读"];
 
 function GeneratingPage() {
+  const reading = useActiveBaziReading();
   const [active, setActive] = useState(0);
   const [done, setDone] = useState(false);
   useEffect(() => {
@@ -248,25 +341,28 @@ function GeneratingPage() {
       <div className="generation" aria-live="polite">
         <div className="generation__art" aria-hidden="true"><span className="generation-orbit" /><span className="generation-grid" /><BrandMark large /></div>
         <p className="eyebrow">CALIBRATING YOUR MAP</p>
-        <h1>{done ? "你的人生地图已生成" : generationStages[active]}</h1>
-        <p>{done ? "三个体系的演示线索已经汇入同一张地图。" : "我们正在把不同传统的结构化线索整理成清晰、可追溯的主题。"}</p>
+        <h1>{done ? "你的八字结构已生成" : generationStages[active]}</h1>
+        <p>{done ? "四柱来自确定性计算；其他体系与综合解释会继续以演示状态清楚标注。" : "我们正在先建立可复算的命盘事实，再把解释与事实分开呈现。"}</p>
         <ol className="generation__stages">
           {generationStages.map((stage, index) => <li key={stage} className={index < active || done ? "is-complete" : index === active ? "is-active" : ""}><span>{index < active || done ? "✓" : String(index + 1).padStart(2, "0")}</span>{stage}</li>)}
         </ol>
+        {done && <div className="generation__result" aria-label="四柱计算结果">{[reading.pillars.year, reading.pillars.month, reading.pillars.day, reading.pillars.time].map((pillar, index) => <span key={pillar?.kind ?? index}><small>{pillar?.label ?? "时柱"}</small><b>{pillar?.ganZhi ?? "未知"}</b></span>)}</div>}
         {done ? <button className="button button--primary" onClick={() => navigate("/today")}>进入今日地图 <span aria-hidden="true">→</span></button> : <button className="text-button" onClick={() => { setActive(generationStages.length - 1); setDone(true); }}>跳过演示动画</button>}
-        <small className="fixture-label">DEMO FIXTURE · 未进行真实排盘</small>
+        <small className="calculation-label">BAZI CALCULATED · OTHER SYSTEMS DEMO</small>
       </div>
     </PageShell>
   );
 }
 
 function TodayPage() {
+  const reading = useActiveBaziReading();
   const today = insights[0];
   const featured = products[0];
   return (
     <PageShell route="today">
       <div className="page today-page">
-        <header className="today-greeting"><div><span>Tuesday · Sep 1</span><h1>晚上好，Yu</h1></div><div className="day-seal" aria-hidden="true"><span>乙</span><small>WOOD</small></div></header>
+        <header className="today-greeting"><div><span>PHASE 2A · CALCULATION FOUNDATION</span><h1>你好，{reading.profile.displayName}</h1></div><div className="day-seal" aria-label={`日主 ${reading.dayMaster.stem}，${reading.dayMaster.element}`}><span>{reading.dayMaster.stem}</span><small>{elementEnglish[reading.dayMaster.element]}</small></div></header>
+        <PhaseScopeNotice />
         <section className="today-hero">
           <div className="today-hero__motif" aria-hidden="true"><i /><i /><i /></div>
           <p className="eyebrow">{today.eyebrow} · TODAY&apos;S THEME</p>
@@ -317,11 +413,14 @@ function InsightPage({ id }: { id?: string }) {
 }
 
 function LifeMapPage() {
+  const reading = useActiveBaziReading();
   return (
     <PageShell route="life-map">
       <div className="page life-map-page">
+        <PhaseScopeNotice />
         <header className="map-hero"><div><p className="eyebrow">YOUR NATAL BLUEPRINT · 你的底图</p><h1>Builder<br /><i>×</i> Explorer</h1><p>你倾向于把模糊的想法变成可以运作的结构，同时需要持续发现新的可能。真正让你投入的，往往不是稳定本身，而是有空间参与定义方向。</p><div className="evidence-chips"><EvidenceChip system="bazi" role="primary" /><EvidenceChip system="ziwei" role="primary" /><EvidenceChip system="astrology" role="supporting" /></div></div><div className="map-diagram" aria-label="三个传统体系汇聚为 Life Map 的抽象图"><span className="map-ring" /><span className="map-grid" /><span className="map-pillars" /><b>命</b></div></header>
         <div className="map-note"><span>如何阅读</span><p>这些领域不是命运评分，而是理解长期模式的入口。当前活跃表示本期内容的主题强调，不代表好或坏。</p></div>
+        <BaziChartCard reading={reading} id="bazi-chart" />
         <section className="section-block"><SectionHeader eyebrow="EIGHT DOMAINS" title="八个生命领域" /><div className="domain-grid domain-grid--all">{domains.map((domain, index) => <Link href={`/life-map/${domain.id}`} className="domain-card domain-card--wide" key={domain.id}><span className="domain-card__index">{String(index + 1).padStart(2, "0")}</span><div><small>{domain.nameEn}</small><h3>{domain.nameZh}</h3></div><p>{domain.pattern}</p><span className={`state state--${domain.state}`}>{domain.state === "active" ? "当前活跃" : domain.state === "steady" ? "稳定主题" : domain.state === "emerging" ? "正在浮现" : "值得反思"}</span><b aria-hidden="true">↗</b></Link>)}</div></section>
       </div>
     </PageShell>
@@ -436,9 +535,20 @@ function ProductPage({ id }: { id?: string }) {
 }
 
 function MePage() {
+  const reading = useActiveBaziReading();
+  const clearProfile = () => {
+    clearBirthProfile();
+    navigate("/onboarding");
+  };
   return (
     <PageShell route="me">
-      <div className="page me-page"><header className="profile-hero"><div className="profile-monogram">Y</div><div><p className="eyebrow">DEMO PROFILE</p><h1>Yu</h1><p>你的 Life Map 演示档案</p></div></header><section className="profile-card"><SectionHeader eyebrow="BIRTH PROFILE" title="出生信息" /><dl><div><dt>出生日期</dt><dd>{demoProfile.birthDate}</dd></div><div><dt>出生时间</dt><dd>{demoProfile.birthTime}</dd></div><div><dt>出生地点</dt><dd>{demoProfile.birthLocation}</dd></div><div><dt>状态</dt><dd><span className="fixture-label">DEMO FIXTURE</span></dd></div></dl><Link href="/onboarding" className="text-link">重新体验引导 →</Link></section><section className="menu-list"><Link href="/objects"><span>象征物收藏</span><small>查看所有演示物品</small><b>→</b></Link><button disabled><span>关系档案</span><small>后续阶段开放</small><b>即将开放</b></button><button disabled><span>通知与每日提醒</span><small>后续阶段开放</small><b>即将开放</b></button></section><section className="trust-card"><p className="eyebrow">TRUST & PRIVACY</p><h2>你的信息，应该被谨慎对待</h2><p>出生信息和关系档案属于敏感个人数据。本阶段不使用账户或云端存储，也不会发送分析事件。</p><ul><li>演示内容并非真实排盘</li><li>没有实时 AI、支付或追踪</li><li>解释传统仅用于个人反思</li></ul></section></div>
+      <div className="page me-page">
+        <header className="profile-hero"><div className="profile-monogram">{reading.profile.displayName.slice(0, 1).toUpperCase()}</div><div><p className="eyebrow">LOCAL SESSION PROFILE</p><h1>{reading.profile.displayName}</h1><p>八字已计算 · 其他体系仍为演示</p></div></header>
+        <section className="profile-card"><SectionHeader eyebrow="BIRTH PROFILE" title="出生信息" /><dl><div><dt>出生日期</dt><dd>{reading.profile.birthDate}</dd></div><div><dt>出生时间</dt><dd>{reading.profile.birthTime ?? "未知"}</dd></div><div><dt>出生地点</dt><dd>{reading.place.label}</dd></div><div><dt>时区</dt><dd>{reading.place.timeZone}</dd></div><div><dt>状态</dt><dd><span className="calculation-label">BAZI CALCULATED</span></dd></div></dl><Link href="/onboarding" className="text-link">重新输入资料 →</Link></section>
+        <BaziChartCard reading={reading} />
+        <section className="menu-list"><Link href="/objects"><span>象征物收藏</span><small>查看所有演示物品</small><b>→</b></Link><button disabled><span>关系档案</span><small>后续阶段开放</small><b>即将开放</b></button><button disabled><span>通知与每日提醒</span><small>后续阶段开放</small><b>即将开放</b></button></section>
+        <section className="trust-card"><p className="eyebrow">TRUST & PRIVACY</p><h2>你的信息，只留在这次浏览会话</h2><p>出生资料只保存在当前浏览器会话中，不会上传、写入账户或发送分析事件。关闭会话后浏览器会清除它。</p><ul><li>八字四柱由确定性引擎在浏览器内计算</li><li>紫微、西占与综合解释仍明确标注为演示</li><li>没有实时 AI、支付或追踪</li></ul><button className="text-button text-button--danger" onClick={clearProfile}>清除本次出生资料</button></section>
+      </div>
     </PageShell>
   );
 }

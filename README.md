@@ -1,6 +1,6 @@
 # Life Map
 
-Life Map is a mobile-first personal reflection prototype combining BaZi, Zi Wei Dou Shu, Western astrology, I Ching, and explainable synthesis. Phase 1 uses fictional, deterministic mock data; it does not perform real chart calculations or make live AI, payment, authentication, analytics, or network requests.
+Life Map is a mobile-first personal reflection product combining BaZi, Zi Wei Dou Shu, Western astrology, I Ching, and explainable synthesis. Phase 2A adds deterministic BaZi Four Pillars calculation for supported birth inputs. Zi Wei, Western astrology, timing, and synthesis remain clearly labeled Phase 1 fixtures; there are still no live AI, payment, authentication, analytics, or application network requests.
 
 ## Run locally
 
@@ -32,8 +32,10 @@ npm run build      # deployment build
 - `app/ui/` contains the responsive screen and component layer.
 - `app/lib/types.ts` defines typed domain contracts.
 - `app/lib/data.ts` contains deterministic fictional fixtures.
+- `app/lib/bazi.ts` owns versioned Four Pillars calculation and conventions.
+- `app/lib/profile-storage.ts` limits sensitive birth inputs to the browser session.
 - `app/lib/repository.ts` resolves references and isolates data access.
-- `tests/` validates fixture integrity, Ask routing, I Ching ordering, and direct routes.
-- Product requirements and acceptance criteria live in `PRODUCT_SPEC.md`, `DESIGN_SYSTEM.md`, `MVP_PLAN.md`, and `MOCK_DATA.md`.
+- `tests/` validates calculation fixtures and boundaries, fixture integrity, Ask routing, I Ching ordering, and direct routes.
+- Product requirements and acceptance criteria live in `PRODUCT_SPEC.md`, `DESIGN_SYSTEM.md`, `MVP_PLAN.md`, `MOCK_DATA.md`, and `PHASE_2_PLAN.md`.
 
 See `AGENTS.md` before contributing. All interpretive language must remain cautious, evidence-linked, and clearly presented as reflective tradition rather than scientific prediction.

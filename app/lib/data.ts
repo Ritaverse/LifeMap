@@ -28,6 +28,7 @@ export const facts: ChartFact[] = [
     label: "乙木日主",
     rawLabel: "Day Master: Yin Wood",
     traditionalInterpretation: "传统上常用来讨论柔韧、适应和持续生长的方式。",
+    limitations: "固定演示事实；不替代 Phase 2A 为当前出生资料计算的日主。",
   },
   {
     id: "fact-bazi-wood-relative-low",
@@ -37,7 +38,7 @@ export const facts: ChartFact[] = [
     label: "木的相对呈现较弱",
     rawLabel: "Relative Wood presence: lower",
     traditionalInterpretation: "这不是缺陷；演示解释提示为成长、恢复和长期培育留出空间。",
-    limitations: "元素权重是演示值，未经过真实排盘。",
+    limitations: "元素权重是固定演示值；Phase 2A 只计算表层干支数量，尚不做旺衰或喜用神判断。",
   },
   {
     id: "fact-bazi-output-structure-tension",
@@ -47,6 +48,7 @@ export const facts: ChartFact[] = [
     label: "表达动力与结构要求同时突出",
     rawLabel: "Demo pattern: expression × structure",
     traditionalInterpretation: "传统解释会把它看作创造冲动与规则、责任之间的持续协商。",
+    limitations: "固定演示解释，尚未由当前用户的真实四柱推导。",
   },
   {
     id: "fact-bazi-current-month-focus",
@@ -56,7 +58,7 @@ export const facts: ChartFact[] = [
     label: "当前月份强调取舍",
     rawLabel: "Demo monthly signal: focus and selection",
     traditionalInterpretation: "演示规则将这一时期解释为先收束资源、再决定投入方向。",
-    limitations: "固定演示文案，并非真实流月计算。",
+    limitations: "固定演示文案，并非真实流月计算；Phase 2A 尚未启用时运引擎。",
   },
   {
     id: "fact-ziwei-life-leadership",
