@@ -32,6 +32,18 @@ test("server-renders directly addressable Phase 1 routes", async () => {
   }
 });
 
+test("server-renders the interactive BaZi chart from calculated facts", async () => {
+  const response = await render("/life-map");
+  assert.equal(response.status, 200);
+  const html = await response.text();
+  assert.match(html, /你的八字命盘/);
+  assert.match(html, /INTERACTIVE CHART · 命盘图/);
+  assert.match(html, /日主/);
+  assert.match(html, /藏干 · 支内十神/);
+  assert.match(html, /数量只描述表层干支/);
+  assert.doesNotMatch(html, /<svg\b/i);
+});
+
 test("unknown dynamic records render a useful error state", async () => {
   for (const path of ["/insights/missing", "/life-map/missing", "/objects/missing"]) {
     const response = await render(path);

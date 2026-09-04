@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { AnchorHTMLAttributes, FormEvent, ReactNode } from "react";
 import { askResponses, domains, iching, insights, products, recommendation, timing } from "../lib/data";
 import { calculateBazi, defaultBirthPlace, demoBaziReading, demoBirthProfile } from "../lib/bazi";
-import type { BaziReading, BirthPlace, FiveElement } from "../lib/bazi";
+import type { BaziPillar, BaziReading, BirthPlace, FiveElement, PillarKind } from "../lib/bazi";
 import { searchBirthPlaces } from "../lib/place-search";
 import { clearBirthProfile, readBirthProfile, readOnboardingDraft, writeBirthProfile, writeOnboardingDraft } from "../lib/profile-storage";
 import type { OnboardingDraft } from "../lib/profile-storage";
@@ -101,6 +101,14 @@ function useActiveBaziReading() {
 }
 
 const elementEnglish: Record<FiveElement, string> = { 木: "WOOD", 火: "FIRE", 土: "EARTH", 金: "METAL", 水: "WATER" };
+const elementOrder: FiveElement[] = ["木", "火", "土", "金", "水"];
+const elementColor: Record<FiveElement, string> = {
+  木: "var(--color-element-wood)",
+  火: "var(--color-element-fire)",
+  土: "var(--color-element-earth)",
+  金: "var(--color-element-metal)",
+  水: "var(--color-element-water)",
+};
 
 function PhaseScopeNotice() {
   return (
@@ -111,14 +119,64 @@ function PhaseScopeNotice() {
   );
 }
 
-function BaziChartCard({ reading, id }: { reading: BaziReading; id?: string }) {
+function elementGradient(reading: BaziReading) {
+  const total = Object.values(reading.visibleElementCounts).reduce((sum, count) => sum + count, 0);
+  let start = 0;
+  return `conic-gradient(from -90deg, ${elementOrder.map((element) => {
+    const end = start + (reading.visibleElementCounts[element] / total) * 100;
+    const segment = `${elementColor[element]} ${start}% ${end}%`;
+    start = end;
+    return segment;
+  }).join(", ")})`;
+}
+
+function BaziChartDrawing({ reading }: { reading: BaziReading }) {
+  const [activeKind, setActiveKind] = useState<PillarKind>("day");
+  const pillars: Array<BaziPillar | null> = [reading.pillars.year, reading.pillars.month, reading.pillars.day, reading.pillars.time];
+  const activePillar = pillars.find((pillar) => pillar?.kind === activeKind) ?? reading.pillars.day;
+  const wheelStyle = { "--bazi-element-gradient": elementGradient(reading) } as React.CSSProperties;
+  const hiddenStems = activePillar.hiddenStems.map((stem, index) => `${stem} · ${activePillar.hiddenTenGods[index] ?? "—"}`);
+
+  return (
+    <div className="bazi-drawing">
+      <div className="bazi-drawing__heading"><div><span>INTERACTIVE CHART · 命盘图</span><h3>四柱围绕日主展开</h3></div><p>点击四柱查看细节。圆环表示表层八个干支的五行数量；方位只用于信息阅读，不是另一套传统推算规则。</p></div>
+      <div className="bazi-drawing__layout">
+        <div className="bazi-wheel" style={wheelStyle} aria-label={`八字命盘图，日主 ${reading.dayMaster.stem}，${reading.dayMaster.polarity}${reading.dayMaster.element}`}>
+          <div className="bazi-wheel__rings" aria-hidden="true"><i /><i /><i /></div>
+          <div className="bazi-wheel__core"><span>日主</span><strong>{reading.dayMaster.stem}</strong><small>{reading.dayMaster.polarity}{reading.dayMaster.element}</small></div>
+          {pillars.map((pillar, index) => pillar ? (
+            <button key={pillar.kind} type="button" className={`bazi-node bazi-node--${pillar.kind} ${activeKind === pillar.kind ? "is-active" : ""}`} aria-pressed={activeKind === pillar.kind} onClick={() => setActiveKind(pillar.kind)}>
+              <span>{pillar.label}</span><b>{pillar.stem}</b><b>{pillar.branch}</b><small>{pillar.elements.join(" · ")}</small>
+            </button>
+          ) : (
+            <button key={`missing-${index}`} type="button" className="bazi-node bazi-node--time is-missing" disabled><span>时柱</span><b>—</b><b>—</b><small>时间未知</small></button>
+          ))}
+        </div>
+        <aside className="pillar-inspector" aria-live="polite">
+          <header><span>{activePillar.label} · {activePillar.kind.toUpperCase()}</span><h3>{activePillar.ganZhi}</h3><p>{activePillar.elements.join(" · ")} · 纳音 {activePillar.naYin}</p></header>
+          <dl>
+            <div><dt>天干</dt><dd>{activePillar.stem}</dd></div>
+            <div><dt>地支</dt><dd>{activePillar.branch}</dd></div>
+            <div><dt>天干十神</dt><dd>{activePillar.stemTenGod}</dd></div>
+            <div><dt>藏干 · 支内十神</dt><dd>{hiddenStems.join(" ／ ") || "—"}</dd></div>
+          </dl>
+          <div className="element-legend" aria-label="表层干支五行分布">{elementOrder.map((element) => <span key={element} style={{ "--element-color": elementColor[element] } as React.CSSProperties}><i /><b>{element}</b><small>{reading.visibleElementCounts[element]}</small></span>)}</div>
+          <p className="pillar-inspector__note">数量只描述表层干支，不等于旺衰、喜用神或吉凶。</p>
+        </aside>
+      </div>
+    </div>
+  );
+}
+
+function BaziChartCard({ reading, id, visual = false }: { reading: BaziReading; id?: string; visual?: boolean }) {
   const pillars = [reading.pillars.year, reading.pillars.month, reading.pillars.day, reading.pillars.time];
   return (
     <section className="bazi-chart" id={id}>
       <header className="bazi-chart__header">
-        <div><p className="eyebrow">DETERMINISTIC CHART FACTS · 确定性命盘事实</p><h2>你的四柱</h2><p>依据你输入的当地出生时间与所列规则计算；这里展示结构化事实，不生成性格或吉凶结论。</p></div>
+        <div><p className="eyebrow">DETERMINISTIC CHART FACTS · 确定性命盘事实</p><h2>{visual ? "你的八字命盘" : "你的四柱"}</h2><p>依据你输入的当地出生时间与所列规则计算；这里展示结构化事实，不生成性格或吉凶结论。</p></div>
         <span className="calculation-label">CALCULATED · v{reading.engine.version}</span>
       </header>
+      {visual && <BaziChartDrawing reading={reading} />}
       <div className="bazi-pillars" aria-label="八字四柱">
         {pillars.map((pillar, index) => pillar ? (
           <article key={pillar.kind} className={pillar.kind === "day" ? "is-day" : ""}>
@@ -476,7 +534,7 @@ function LifeMapPage() {
         <PhaseScopeNotice />
         <header className="map-hero"><div><p className="eyebrow">YOUR NATAL BLUEPRINT · 你的底图</p><h1>Builder<br /><i>×</i> Explorer</h1><p>你倾向于把模糊的想法变成可以运作的结构，同时需要持续发现新的可能。真正让你投入的，往往不是稳定本身，而是有空间参与定义方向。</p><div className="evidence-chips"><EvidenceChip system="bazi" role="primary" /><EvidenceChip system="ziwei" role="primary" /><EvidenceChip system="astrology" role="supporting" /></div></div><div className="map-diagram" aria-label="三个传统体系汇聚为 Life Map 的抽象图"><span className="map-ring" /><span className="map-grid" /><span className="map-pillars" /><b>命</b></div></header>
         <div className="map-note"><span>如何阅读</span><p>这些领域不是命运评分，而是理解长期模式的入口。当前活跃表示本期内容的主题强调，不代表好或坏。</p></div>
-        <BaziChartCard reading={reading} id="bazi-chart" />
+        <BaziChartCard reading={reading} id="bazi-chart" visual />
         <section className="section-block"><SectionHeader eyebrow="EIGHT DOMAINS" title="八个生命领域" /><div className="domain-grid domain-grid--all">{domains.map((domain, index) => <Link href={`/life-map/${domain.id}`} className="domain-card domain-card--wide" key={domain.id}><span className="domain-card__index">{String(index + 1).padStart(2, "0")}</span><div><small>{domain.nameEn}</small><h3>{domain.nameZh}</h3></div><p>{domain.pattern}</p><span className={`state state--${domain.state}`}>{domain.state === "active" ? "当前活跃" : domain.state === "steady" ? "稳定主题" : domain.state === "emerging" ? "正在浮现" : "值得反思"}</span><b aria-hidden="true">↗</b></Link>)}</div></section>
       </div>
     </PageShell>

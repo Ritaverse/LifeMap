@@ -18,6 +18,11 @@
   --color-focus: #275dce;
   --color-error: #9c3e36;
   --color-success: #3e6954;
+  --color-element-wood: #4f7664;
+  --color-element-fire: #a44738;
+  --color-element-earth: #a17b48;
+  --color-element-metal: #8a8b87;
+  --color-element-water: #344f60;
   --font-editorial: "Noto Serif SC", "Source Han Serif SC", "Songti SC", Georgia, serif;
   --font-ui: Inter, "Noto Sans SC", "Source Han Sans SC", "PingFang SC", system-ui, sans-serif;
   --space-1: 4px;
@@ -245,6 +250,57 @@ h1, h2, h3, p { margin-top: 0; }
 .bazi-chart__header > div { max-width: 650px; }
 .bazi-chart__header h2 { margin-bottom: 7px; font-family: var(--font-editorial); font-size: clamp(29px, 5vw, 38px); font-weight: 550; }
 .bazi-chart__header p:not(.eyebrow) { margin: 0; font-size: 12px; }
+.bazi-drawing { padding: 28px 0 30px; border-bottom: 1px solid var(--color-line); }
+.bazi-drawing__heading { display: grid; grid-template-columns: 1fr minmax(260px, .85fr); gap: 34px; align-items: end; margin-bottom: 22px; }
+.bazi-drawing__heading span { color: var(--color-cinnabar); font-size: 9px; font-weight: 800; letter-spacing: .11em; }
+.bazi-drawing__heading h3 { margin: 6px 0 0; font-family: var(--font-editorial); font-size: 24px; font-weight: 550; }
+.bazi-drawing__heading p { margin: 0; color: var(--color-ink-muted); font-size: 10px; line-height: 1.6; }
+.bazi-drawing__layout { display: grid; grid-template-columns: minmax(360px, 1.25fr) minmax(250px, .75fr); gap: clamp(22px, 4vw, 42px); align-items: center; }
+.bazi-wheel { position: relative; width: min(100%, 560px); aspect-ratio: 1; margin: 0 auto; isolation: isolate; }
+.bazi-wheel::before { position: absolute; z-index: -1; inset: 9%; border-radius: 50%; background: var(--bazi-element-gradient); content: ""; opacity: .82; -webkit-mask: radial-gradient(circle, transparent 0 72%, #000 73% 100%); mask: radial-gradient(circle, transparent 0 72%, #000 73% 100%); }
+.bazi-wheel__rings, .bazi-wheel__rings i { position: absolute; border: 1px solid var(--color-line); border-radius: 50%; pointer-events: none; }
+.bazi-wheel__rings { inset: 7%; border-color: var(--color-line-strong); }
+.bazi-wheel__rings i:nth-child(1) { inset: 14%; }
+.bazi-wheel__rings i:nth-child(2) { inset: 31%; border-style: dashed; }
+.bazi-wheel__rings i:nth-child(3) { inset: 44%; border-color: var(--color-cinnabar); }
+.bazi-wheel__rings::before, .bazi-wheel__rings::after { position: absolute; z-index: -1; top: 50%; left: 50%; background: var(--color-line); content: ""; transform: translate(-50%, -50%); }
+.bazi-wheel__rings::before { width: 76%; height: 1px; }
+.bazi-wheel__rings::after { width: 1px; height: 76%; }
+.bazi-wheel__core { position: absolute; z-index: 2; top: 50%; left: 50%; display: grid; place-items: center; width: 112px; height: 112px; border: 1px solid var(--color-cinnabar); border-radius: 50%; background: var(--color-canvas); box-shadow: 0 0 0 10px rgb(245 241 232 / 80%); transform: translate(-50%, -50%); }
+.bazi-wheel__core span { color: var(--color-ink-muted); font-size: 8px; font-weight: 750; letter-spacing: .12em; }
+.bazi-wheel__core strong { margin: -4px 0; color: var(--color-cinnabar); font-family: var(--font-editorial); font-size: 45px; font-weight: 500; line-height: 1; }
+.bazi-wheel__core small { color: var(--color-ink-soft); font-size: 10px; font-weight: 700; }
+.bazi-node { position: absolute; z-index: 3; display: grid; grid-template-columns: 1fr 1fr; align-content: center; width: 88px; min-height: 98px; padding: 10px; border: 1px solid var(--color-line-strong); border-radius: 44px; background: var(--color-surface); color: var(--color-ink); cursor: pointer; box-shadow: var(--shadow-soft); transition: border-color 180ms ease, background 180ms ease, transform 180ms ease; }
+.bazi-node:hover { border-color: var(--color-jade); background: var(--color-jade-soft); }
+.bazi-node.is-active { border-color: var(--color-cinnabar); background: var(--color-cinnabar-soft); box-shadow: 0 0 0 4px var(--color-canvas), 0 0 0 5px var(--color-cinnabar); }
+.bazi-node.is-missing { background: var(--color-surface-strong); box-shadow: none; }
+.bazi-node > span, .bazi-node > small { grid-column: 1 / -1; }
+.bazi-node > span { margin-bottom: 5px; color: var(--color-ink-muted); font-size: 8px; font-weight: 750; letter-spacing: .08em; }
+.bazi-node > b { font-family: var(--font-editorial); font-size: 24px; font-weight: 550; }
+.bazi-node > small { margin-top: 4px; color: var(--color-jade-deep); font-size: 8px; }
+.bazi-node--year { top: 1%; left: 50%; transform: translateX(-50%); }
+.bazi-node--year:hover, .bazi-node--year.is-active { transform: translateX(-50%) translateY(-2px); }
+.bazi-node--month { top: 50%; right: 1%; transform: translateY(-50%); }
+.bazi-node--month:hover, .bazi-node--month.is-active { transform: translateY(-50%) translateX(2px); }
+.bazi-node--day { bottom: 1%; left: 50%; transform: translateX(-50%); }
+.bazi-node--day:hover, .bazi-node--day.is-active { transform: translateX(-50%) translateY(2px); }
+.bazi-node--time { top: 50%; left: 1%; transform: translateY(-50%); }
+.bazi-node--time:hover, .bazi-node--time.is-active { transform: translateY(-50%) translateX(-2px); }
+.pillar-inspector { overflow: hidden; border: 1px solid var(--color-line); border-radius: var(--radius-lg); background: var(--color-canvas); }
+.pillar-inspector > header { padding: 23px; border-bottom: 1px solid var(--color-line); background: var(--color-surface-strong); }
+.pillar-inspector > header span { color: var(--color-cinnabar); font-size: 9px; font-weight: 800; letter-spacing: .1em; }
+.pillar-inspector > header h3 { margin: 8px 0 3px; font-family: var(--font-editorial); font-size: 38px; font-weight: 500; }
+.pillar-inspector > header p { margin: 0; font-size: 10px; }
+.pillar-inspector dl { margin: 0; padding: 8px 23px; }
+.pillar-inspector dl div { display: grid; grid-template-columns: 88px 1fr; gap: 14px; padding: 12px 0; border-bottom: 1px solid var(--color-line); }
+.pillar-inspector dt { color: var(--color-ink-muted); font-size: 9px; }
+.pillar-inspector dd { margin: 0; font-size: 11px; line-height: 1.55; }
+.element-legend { display: grid; grid-template-columns: repeat(5, 1fr); padding: 14px 18px; }
+.element-legend span { display: grid; place-items: center; gap: 3px; color: var(--color-ink-muted); font-size: 9px; }
+.element-legend i { width: 8px; height: 8px; border-radius: 50%; background: var(--element-color); }
+.element-legend b { color: var(--color-ink); font-size: 10px; }
+.element-legend small { font-size: 9px; }
+.pillar-inspector__note { margin: 0; padding: 0 23px 18px; color: var(--color-ink-muted); font-size: 9px; line-height: 1.5; }
 .bazi-pillars { display: grid; grid-template-columns: repeat(4, 1fr); margin-top: 26px; border: 1px solid var(--color-line); }
 .bazi-pillars article { min-width: 0; padding: 18px 13px; text-align: center; }
 .bazi-pillars article + article { border-left: 1px solid var(--color-line); }
@@ -611,6 +667,9 @@ h1, h2, h3, p { margin-top: 0; }
   .product-gallery { position: static; }
   .product-gallery .product-visual { min-height: 430px; }
   .bazi-chart__header { flex-direction: column; gap: 12px; }
+  .bazi-drawing__heading { grid-template-columns: 1fr; gap: 10px; }
+  .bazi-drawing__layout { grid-template-columns: 1fr; }
+  .bazi-wheel { width: min(100%, 520px); }
   .bazi-chart__summary { grid-template-columns: 1fr; }
   .calculation-details dl { grid-template-columns: 1fr 1fr; }
 }
@@ -656,6 +715,12 @@ h1, h2, h3, p { margin-top: 0; }
   .location-results button > span:last-child { text-align: left; }
   .phase-scope { grid-template-columns: 1fr; }
   .bazi-chart { padding: 22px 18px; border-radius: var(--radius-lg); }
+  .bazi-drawing { padding-top: 23px; }
+  .bazi-wheel__core { width: 90px; height: 90px; box-shadow: 0 0 0 6px rgb(245 241 232 / 82%); }
+  .bazi-wheel__core strong { font-size: 37px; }
+  .bazi-node { width: 72px; min-height: 84px; padding: 8px; border-radius: 36px; }
+  .bazi-node > b { font-size: 20px; }
+  .bazi-node > span, .bazi-node > small { font-size: 7px; }
   .bazi-pillars { grid-template-columns: 1fr 1fr; }
   .bazi-pillars article:nth-child(3) { border-left: 0; border-top: 1px solid var(--color-line); }
   .bazi-pillars article:nth-child(4) { border-top: 1px solid var(--color-line); }

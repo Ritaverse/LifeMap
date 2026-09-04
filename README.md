@@ -1,6 +1,6 @@
 # Life Map
 
-Life Map is a mobile-first personal reflection product combining BaZi, Zi Wei Dou Shu, Western astrology, I Ching, and explainable synthesis. Phase 2A adds deterministic BaZi Four Pillars calculation and global city search for birth inputs. Zi Wei, Western astrology, timing, and synthesis remain clearly labeled Phase 1 fixtures; there are still no live AI, payment, authentication, or analytics requests.
+Life Map is a mobile-first personal reflection product combining BaZi, Zi Wei Dou Shu, Western astrology, I Ching, and explainable synthesis. Phase 2A adds deterministic BaZi Four Pillars calculation, an interactive fact-based chart, and global city search for birth inputs. Zi Wei, Western astrology, timing, and synthesis remain clearly labeled Phase 1 fixtures; there are still no live AI, payment, authentication, or analytics requests.
 
 Location search sends only an explicitly submitted city/country query to the Open-Meteo geocoding endpoint. Names, birth dates, and birth times stay in the browser session. The public endpoint is suitable for this private prototype; commercial production use requires reviewing Open-Meteo customer access and pricing.
 

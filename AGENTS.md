@@ -134,7 +134,7 @@ Names may adapt to repository conventions. Preserve separation among primitives,
 
 ## Project Structure & Module Organization
 
-The repository currently contains product documentation but no application scaffold. Organize the implementation under `src/`, with route modules, reusable components, domain types, local fixtures, a mock repository, selectors, and centralized styles. Keep tests in `src/test/` or beside features according to the chosen test runner; place static assets under `public/` and longer notes under `docs/` when needed. Do not commit generated output, dependencies, editor settings, or local caches.
+The application uses Next.js-compatible routes under `app/`. Keep reusable screens and components in `app/ui/`, deterministic calculation and storage adapters in `app/lib/`, route entry points in `app/**/page.tsx`, and automated checks in `tests/`. Static assets belong in `public/`; product requirements and staged plans remain in the repository root. Do not commit generated output, dependencies, editor settings, or local caches.
 
 Recommended boundary:
 
@@ -144,7 +144,7 @@ Typed fixtures → mock repository/service → selectors/view models → compone
 
 ## Build, Test, and Development Commands
 
-The application toolchain has not yet been scaffolded. Once established, expose and document a consistent script set:
+Use the repository scripts so contributors run identical versions and options:
 
 - `npm run dev`: start the local development environment.
 - `npm run typecheck`: validate strict TypeScript boundaries.
@@ -152,7 +152,7 @@ The application toolchain has not yet been scaffolded. Once established, expose 
 - `npm test`: run the automated test suite.
 - `npm run build`: create the production artifact.
 
-Prefer repository scripts over global tool commands so contributors use identical versions and options.
+`npm test` includes a production build before running Node tests. Use Node.js 22.13 or newer.
 
 ## Coding Style & Naming Conventions
 
@@ -184,7 +184,7 @@ The UI must feel designed with images disabled. Typography, spacing, composition
 
 ## Commit & Pull Request Guidelines
 
-Git history is not available in this scaffold. Use concise Conventional Commit-style subjects such as `feat: add location search` or `fix: handle missing coordinates`. Keep commits narrowly scoped. Pull requests should explain motivation and implementation, list verification performed, link relevant issues, and include screenshots or recordings for visual changes. Call out migrations, dependencies, and follow-up work explicitly.
+Recent history uses concise Conventional Commit-style subjects such as `feat: add global birth location search` and `fix: handle missing coordinates`. Keep commits narrowly scoped. Pull requests should explain motivation and implementation, list verification performed, link relevant issues, and include screenshots or recordings for visual changes. Call out migrations, dependencies, and follow-up work explicitly.
 
 ## Security & Configuration
 
@@ -198,6 +198,7 @@ Phase 2A is complete only when:
 - Supported birth inputs produce deterministic, versioned Four Pillars output.
 - Unknown birth time omits the time pillar and exposes boundary limitations.
 - Calculation rules and engine version are visible to the user.
+- The Life Map chart is driven only by engine facts and exposes pillar details accessibly.
 - Calculated facts remain visually and structurally separate from fixture interpretation.
 - Sensitive inputs stay in the current browser session and can be cleared.
 - Known-result, boundary, invalid-input, type, lint, route, and build checks pass.
