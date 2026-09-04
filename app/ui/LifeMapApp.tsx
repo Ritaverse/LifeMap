@@ -113,7 +113,7 @@ const elementColor: Record<FiveElement, string> = {
 function PhaseScopeNotice() {
   return (
     <aside className="phase-scope" aria-label="当前计算范围">
-      <span>PHASE 2A</span>
+      <span>体验边界</span>
       <p><strong>八字四柱已启用真实计算。</strong> 紫微、西占、时运与综合洞察目前仍是固定演示内容，不会混作你的真实结果。</p>
     </aside>
   );
@@ -173,8 +173,8 @@ function BaziChartCard({ reading, id, visual = false }: { reading: BaziReading; 
   return (
     <section className="bazi-chart" id={id}>
       <header className="bazi-chart__header">
-        <div><p className="eyebrow">DETERMINISTIC CHART FACTS · 确定性命盘事实</p><h2>{visual ? "你的八字命盘" : "你的四柱"}</h2><p>依据你输入的当地出生时间与所列规则计算；这里展示结构化事实，不生成性格或吉凶结论。</p></div>
-        <span className="calculation-label">CALCULATED · v{reading.engine.version}</span>
+        <div><p className="eyebrow">YOUR FOUR PILLARS · 四柱排盘</p><h2>{visual ? "你的八字命盘" : "你的四柱"}</h2><p>依据你输入的当地出生时间与所列规则计算；这里展示结构化事实，不生成性格或吉凶结论。</p></div>
+        <span className="calculation-label">已排盘 · v{reading.engine.version}</span>
       </header>
       {visual && <BaziChartDrawing reading={reading} />}
       <div className="bazi-pillars" aria-label="八字四柱">
@@ -462,7 +462,7 @@ function GeneratingPage() {
         </ol>
         {done && <div className="generation__result" aria-label="四柱计算结果">{[reading.pillars.year, reading.pillars.month, reading.pillars.day, reading.pillars.time].map((pillar, index) => <span key={pillar?.kind ?? index}><small>{pillar?.label ?? "时柱"}</small><b>{pillar?.ganZhi ?? "未知"}</b></span>)}</div>}
         {done ? <button className="button button--primary" onClick={() => navigate("/today")}>进入今日地图 <span aria-hidden="true">→</span></button> : <button className="text-button" onClick={() => { setActive(generationStages.length - 1); setDone(true); }}>跳过演示动画</button>}
-        <small className="calculation-label">BAZI CALCULATED · OTHER SYSTEMS DEMO</small>
+        <small className="calculation-label">八字已排盘 · 其余体系为体验内容</small>
       </div>
     </PageShell>
   );
@@ -475,7 +475,7 @@ function TodayPage() {
   return (
     <PageShell route="today">
       <div className="page today-page">
-        <header className="today-greeting"><div><span>PHASE 2A · CALCULATION FOUNDATION</span><h1>你好，{reading.profile.displayName}</h1></div><div className="day-seal" aria-label={`日主 ${reading.dayMaster.stem}，${reading.dayMaster.element}`}><span>{reading.dayMaster.stem}</span><small>{elementEnglish[reading.dayMaster.element]}</small></div></header>
+        <header className="today-greeting"><div><span>YOUR INNER WEATHER · 此刻的内在天气</span><h1>你好，{reading.profile.displayName}</h1></div><div className="day-seal" aria-label={`日主 ${reading.dayMaster.stem}，${reading.dayMaster.element}`}><span>{reading.dayMaster.stem}</span><small>{elementEnglish[reading.dayMaster.element]}</small></div></header>
         <PhaseScopeNotice />
         <section className="today-hero">
           <div className="today-hero__motif" aria-hidden="true"><i /><i /><i /></div>
@@ -657,8 +657,8 @@ function MePage() {
   return (
     <PageShell route="me">
       <div className="page me-page">
-        <header className="profile-hero"><div className="profile-monogram">{reading.profile.displayName.slice(0, 1).toUpperCase()}</div><div><p className="eyebrow">LOCAL SESSION PROFILE</p><h1>{reading.profile.displayName}</h1><p>八字已计算 · 其他体系仍为演示</p></div></header>
-        <section className="profile-card"><SectionHeader eyebrow="BIRTH PROFILE" title="出生信息" /><dl><div><dt>出生日期</dt><dd>{reading.profile.birthDate}</dd></div><div><dt>出生时间</dt><dd>{reading.profile.birthTime ?? "未知"}</dd></div><div><dt>出生地点</dt><dd>{reading.place.label}</dd></div><div><dt>时区</dt><dd>{reading.place.timeZone}</dd></div><div><dt>状态</dt><dd><span className="calculation-label">BAZI CALCULATED</span></dd></div></dl><Link href="/onboarding" className="text-link">重新输入资料 →</Link></section>
+        <header className="profile-hero"><div className="profile-monogram">{reading.profile.displayName.slice(0, 1).toUpperCase()}</div><div><p className="eyebrow">YOUR PRIVATE SPACE · 你的内在空间</p><h1>{reading.profile.displayName}</h1><p>八字已计算 · 其他体系仍为演示</p></div></header>
+        <section className="profile-card"><SectionHeader eyebrow="BIRTH PROFILE" title="出生信息" /><dl><div><dt>出生日期</dt><dd>{reading.profile.birthDate}</dd></div><div><dt>出生时间</dt><dd>{reading.profile.birthTime ?? "未知"}</dd></div><div><dt>出生地点</dt><dd>{reading.place.label}</dd></div><div><dt>时区</dt><dd>{reading.place.timeZone}</dd></div><div><dt>状态</dt><dd><span className="calculation-label">八字已排盘</span></dd></div></dl><Link href="/onboarding" className="text-link">重新输入资料 →</Link></section>
         <BaziChartCard reading={reading} />
         <section className="menu-list"><Link href="/objects"><span>象征物收藏</span><small>查看所有演示物品</small><b>→</b></Link><button disabled><span>关系档案</span><small>后续阶段开放</small><b>即将开放</b></button><button disabled><span>通知与每日提醒</span><small>后续阶段开放</small><b>即将开放</b></button></section>
         <section className="trust-card"><p className="eyebrow">TRUST & PRIVACY</p><h2>你的信息，只留在这次浏览会话</h2><p>出生资料只保存在当前浏览器会话中，不会上传、写入账户或发送分析事件。关闭会话后浏览器会清除它。</p><ul><li>八字四柱由确定性引擎在浏览器内计算</li><li>紫微、西占与综合解释仍明确标注为演示</li><li>没有实时 AI、支付或追踪</li></ul><button className="text-button text-button--danger" onClick={clearProfile}>清除本次出生资料</button></section>

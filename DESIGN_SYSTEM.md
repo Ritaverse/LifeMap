@@ -2,13 +2,13 @@
 
 ## 1. Creative Direction
 
-**Modern Oriental × Editorial**
+**Ink Nocturne × Personal Ritual**
 
-Life Map should feel quiet, tactile, intelligent, and premium. Its visual identity comes from proportion, typography, warm materials, fine lines, and restrained symbolic geometry—not from mystical spectacle.
+Life Map should feel like opening a private night journal: intimate, contemplative, spiritual, and quietly mysterious. Its identity comes from deep ink surfaces, moon-paper typography, dim metallic accents, fine lines, and restrained symbolic geometry—not from spectacle or generic wellness branding.
 
 Desired qualities:
 
-- Warm, not yellowed
+- Nocturnal, not gloomy
 - Spiritual, not supernatural
 - Cultural, not ornamental
 - Editorial, not austere
@@ -43,32 +43,32 @@ Combine no more than two motifs in a single composition. Geometry should serve h
 
 | Token | Value | Use |
 |---|---:|---|
-| `--color-canvas` | `#F5F1E8` | Primary warm-ivory page background |
-| `--color-surface` | `#FBF8F1` | Raised cards and sheets |
-| `--color-surface-strong` | `#EEE8DC` | Selected or emphasized neutral surface |
-| `--color-ink` | `#171714` | Primary text |
-| `--color-ink-soft` | `#55534D` | Secondary text |
-| `--color-ink-muted` | `#77736A` | Metadata and tertiary labels |
-| `--color-line` | `#D9D1C3` | Dividers and card borders |
-| `--color-line-strong` | `#BDB3A3` | Emphasized dividers and inputs |
-| `--color-jade` | `#496B5D` | Primary brand accent |
-| `--color-jade-deep` | `#2F4D42` | Hover/pressed or dark accent surface |
-| `--color-jade-soft` | `#DCE6DF` | Pills and supporting surfaces |
-| `--color-cinnabar` | `#A44738` | Restrained alerts, moving lines, special marks |
-| `--color-cinnabar-soft` | `#EEDDD7` | Subtle highlight surface |
-| `--color-gold-muted` | `#9A7A48` | Small premium/material details only |
-| `--color-focus` | `#275DCE` | Accessible keyboard focus ring |
-| `--color-error` | `#9C3E36` | Validation and errors |
-| `--color-success` | `#3E6954` | Completed states |
+| `--color-canvas` | `#0B1112` | Deep ink page background |
+| `--color-surface` | `#141C1D` | Raised reading cards and sheets |
+| `--color-surface-strong` | `#1C2725` | Selected or ritual-focused surface |
+| `--color-ink` | `#F2E8D4` | Primary moon-paper text |
+| `--color-ink-soft` | `#C8BDA8` | Secondary text |
+| `--color-ink-muted` | `#958D7F` | Metadata and tertiary labels |
+| `--color-line` | `#2B3735` | Dividers and card borders |
+| `--color-line-strong` | `#46534F` | Emphasized dividers and inputs |
+| `--color-jade` | `#86AA98` | Living, reflective accent |
+| `--color-jade-deep` | `#B9D0C3` | High-contrast jade text |
+| `--color-jade-soft` | `#1A2B27` | Tinted supporting surfaces |
+| `--color-cinnabar` | `#C76D59` | Seals, moving lines, and special marks |
+| `--color-cinnabar-soft` | `#2B1C1A` | Subtle tension surface |
+| `--color-gold-muted` | `#C4A46D` | Ritual markers and fine metallic details |
+| `--color-focus` | `#F1C66D` | Accessible keyboard focus ring |
+| `--color-error` | `#E68B7B` | Validation and errors |
+| `--color-success` | `#91B6A3` | Completed states |
 
 ### Usage ratio
 
-- 70–80% ivory and neutral surfaces
-- 15–20% ink and line work
+- 70–80% ink canvas and dark mineral surfaces
+- 15–20% moon-paper text and line work
 - 5–10% jade
-- Less than 2% cinnabar or muted gold
+- Less than 3% cinnabar or muted gold
 
-Jade is the product accent. Cinnabar should feel like a seal or editorial annotation, never a broad brand wash.
+Jade carries interaction and reflection. Muted gold establishes the ritual rhythm; cinnabar should feel like a seal or annotation, never a broad brand wash.
 
 ### Contrast
 
@@ -138,22 +138,23 @@ Use a 4 px base:
 ### Radius
 
 ```css
---radius-sm: 8px;
---radius-md: 14px;
---radius-lg: 22px;
---radius-xl: 30px;
+--radius-sm: 10px;
+--radius-md: 18px;
+--radius-lg: 28px;
+--radius-xl: 42px;
 --radius-pill: 999px;
 ```
 
-Cards should generally use 14–22 px radius. Do not make every element pill-shaped.
+Cards should generally use 18–28 px radius. Large ritual moments may use 42 px; do not make every element pill-shaped.
 
 ### Borders and shadows
 
-Prefer a fine border to a strong shadow.
+Prefer a fine mineral border and a faint inner highlight. Shadows should create depth in the dark canvas without making cards float like dashboard widgets.
 
 ```css
---shadow-soft: 0 10px 30px rgba(31, 27, 20, 0.06);
---shadow-overlay: 0 20px 60px rgba(31, 27, 20, 0.14);
+--shadow-soft: 0 18px 50px rgb(0 0 0 / 22%);
+--shadow-overlay: 0 24px 80px rgb(0 0 0 / 48%);
+--shadow-inner: inset 0 1px 0 rgb(242 232 212 / 6%);
 ```
 
 Use `--shadow-soft` only on important raised cards, product imagery, and floating navigation. Most cards should use a 1 px `--color-line` border.
@@ -214,7 +215,7 @@ When `prefers-reduced-motion: reduce` is enabled:
 
 ### 8.1 App shell
 
-`AppShell` manages canvas, max width, safe areas, and persistent navigation. On desktop, the experience may appear as an editorial app canvas rather than an artificially narrow phone replica.
+`AppShell` manages the ink canvas, max width, safe areas, and persistent navigation. A very faint orbital field may sit behind content, but it must never reduce text contrast or become a star-field effect.
 
 ### 8.2 Top bar
 
@@ -226,15 +227,16 @@ When `prefers-reduced-motion: reduce` is enabled:
 ### 8.3 Bottom navigation
 
 - Five destinations: Today, Life Map, Ask, Timing, Me
+- Use one centered floating dock on mobile and desktop so the product feels like a personal instrument rather than a dashboard sidebar
 - Ask may receive a distinctive central mark, but must not become an oversized floating novelty button
-- Active state uses ink plus jade indicator; inactive state uses muted ink
+- Active state uses moon-paper text plus a muted-gold indicator; inactive state uses muted ink
 - Label remains visible; do not rely on icons alone
 - Minimum target size: 44 × 44 px
 
 ### 8.4 Buttons
 
 **Primary:** jade background, warm-white text, minimum 48 px height  
-**Secondary:** transparent/ivory, 1 px strong border, ink text  
+**Secondary:** dark mineral surface, 1 px strong border, moon-paper text
 **Tertiary:** text with arrow or underline on hover  
 **Destructive:** reserved for data removal; not needed in the primary demo
 
@@ -252,9 +254,9 @@ Buttons use sentence case. Disabled states must remain legible and explain why w
 
 Base style:
 
-- Surface background
+- Dark mineral surface with an optional quiet radial tint
 - 1 px neutral border
-- 18–22 px radius
+- 18–28 px radius
 - 20–24 px internal padding on mobile
 - Optional eyebrow, title, body, metadata, and footer action
 
@@ -263,7 +265,7 @@ Cards should not all have identical visual weight. Use borderless grouped sectio
 ### 8.7 Today hero
 
 - Tallest and most spacious card on Today
-- Soft ivory or lightly tinted jade surface
+- Deep jade-black surface with one warm radial glow
 - A small geometric motif may sit at an edge, not behind body copy
 - Theme title uses the editorial serif
 - Evidence chips sit below the summary
@@ -432,35 +434,36 @@ Codex may adapt naming to the chosen framework, but centralize equivalent values
 
 ```css
 :root {
-  --color-canvas: #f5f1e8;
-  --color-surface: #fbf8f1;
-  --color-surface-strong: #eee8dc;
-  --color-ink: #171714;
-  --color-ink-soft: #55534d;
-  --color-ink-muted: #77736a;
-  --color-line: #d9d1c3;
-  --color-line-strong: #bdb3a3;
-  --color-jade: #496b5d;
-  --color-jade-deep: #2f4d42;
-  --color-jade-soft: #dce6df;
-  --color-cinnabar: #a44738;
-  --color-cinnabar-soft: #eeddd7;
-  --color-gold-muted: #9a7a48;
-  --color-focus: #275dce;
-  --color-error: #9c3e36;
-  --color-success: #3e6954;
+  --color-canvas: #0b1112;
+  --color-surface: #141c1d;
+  --color-surface-strong: #1c2725;
+  --color-ink: #f2e8d4;
+  --color-ink-soft: #c8bda8;
+  --color-ink-muted: #958d7f;
+  --color-line: #2b3735;
+  --color-line-strong: #46534f;
+  --color-jade: #86aa98;
+  --color-jade-deep: #b9d0c3;
+  --color-jade-soft: #1a2b27;
+  --color-cinnabar: #c76d59;
+  --color-cinnabar-soft: #2b1c1a;
+  --color-gold-muted: #c4a46d;
+  --color-focus: #f1c66d;
+  --color-error: #e68b7b;
+  --color-success: #91b6a3;
 
   --font-editorial: "Noto Serif SC", "Source Han Serif SC", "Songti SC", Georgia, serif;
   --font-ui: Inter, "Noto Sans SC", "Source Han Sans SC", "PingFang SC", system-ui, sans-serif;
 
-  --radius-sm: 8px;
-  --radius-md: 14px;
-  --radius-lg: 22px;
-  --radius-xl: 30px;
+  --radius-sm: 10px;
+  --radius-md: 18px;
+  --radius-lg: 28px;
+  --radius-xl: 42px;
   --radius-pill: 999px;
 
-  --shadow-soft: 0 10px 30px rgb(31 27 20 / 6%);
-  --shadow-overlay: 0 20px 60px rgb(31 27 20 / 14%);
+  --shadow-soft: 0 18px 50px rgb(0 0 0 / 22%);
+  --shadow-overlay: 0 24px 80px rgb(0 0 0 / 48%);
+  --shadow-inner: inset 0 1px 0 rgb(242 232 212 / 6%);
 }
 ```
 
@@ -478,4 +481,3 @@ Before considering a screen complete, check:
 - Does the experience remain coherent without decorative imagery?
 - Does every product claim remain symbolic and non-guaranteed?
 - Has the screen been visually inspected in a running app?
-
