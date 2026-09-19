@@ -90,6 +90,10 @@ export interface Product {
   shortDescription: string;
   price: string;
   palette: [string, string, string];
+  image: {
+    src: string;
+    alt: string;
+  };
   elements: string[];
   intentions: string[];
   traditionalMeaning: string;

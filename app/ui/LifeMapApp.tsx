@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import type { AnchorHTMLAttributes, FormEvent, ReactNode } from "react";
 import { askResponses, domains, iching, insights, products, recommendation, timing } from "../lib/data";
@@ -130,6 +131,35 @@ function elementGradient(reading: BaziReading) {
   }).join(", ")})`;
 }
 
+function ElementPresenceGraph({ reading, compact = false }: { reading: BaziReading; compact?: boolean }) {
+  const counts = reading.visibleElementCounts;
+  const maxCount = Math.max(1, ...Object.values(counts));
+  const accessibleSummary = elementOrder.map((element) => `${element}${counts[element]}`).join("，");
+
+  return (
+    <figure className={`element-presence ${compact ? "element-presence--compact" : ""}`}>
+      <header><span>VISIBLE ELEMENTS · 表层五行</span><strong>八个干支中的出现次数</strong></header>
+      <div className="element-presence__plot" role="img" aria-label={`表层五行数量：${accessibleSummary}`}>
+        {elementOrder.map((element, index) => (
+          <div className="element-presence__column" key={element}>
+            <div className="element-presence__bar">
+              <span>{counts[element]}</span>
+              <i style={{
+                "--element-color": elementColor[element],
+                "--element-height": `${(counts[element] / maxCount) * 100}%`,
+                "--element-delay": `${index * 70}ms`,
+              } as React.CSSProperties} />
+            </div>
+            <b>{element}</b>
+            <small>{elementEnglish[element]}</small>
+          </div>
+        ))}
+      </div>
+      <figcaption>数量只描述表层干支，不等于旺衰、喜用神、吉凶或元素“缺失”。</figcaption>
+    </figure>
+  );
+}
+
 function BaziChartDrawing({ reading }: { reading: BaziReading }) {
   const [activeKind, setActiveKind] = useState<PillarKind>("day");
   const pillars: Array<BaziPillar | null> = [reading.pillars.year, reading.pillars.month, reading.pillars.day, reading.pillars.time];
@@ -195,9 +225,7 @@ function BaziChartCard({ reading, id, visual = false }: { reading: BaziReading; 
         <div><span>日主</span><strong>{reading.dayMaster.stem} · {reading.dayMaster.polarity}{reading.dayMaster.element}</strong><small>{elementEnglish[reading.dayMaster.element]}</small></div>
         <div><span>农历日期</span><strong>{reading.lunarDate}</strong><small>{reading.place.timeZone}</small></div>
       </div>
-      <div className="element-counts" aria-label="表层干支五行数量">
-        {(Object.entries(reading.visibleElementCounts) as Array<[FiveElement, number]>).map(([element, count]) => <span key={element}><b>{element}</b>{count}</span>)}
-      </div>
+      <ElementPresenceGraph reading={reading} compact={!visual} />
       <details className="calculation-details">
         <summary>查看计算规则与限制</summary>
         <dl><div><dt>年界</dt><dd>立春</dd></div><div><dt>月界</dt><dd>节气中的「节」</dd></div><div><dt>日界</dt><dd>当地民用时间 00:00</dd></div><div><dt>真太阳时</dt><dd>本阶段未校正</dd></div></dl>
@@ -237,10 +265,10 @@ function EvidenceList({ evidence }: { evidence: EvidenceRef[] }) {
 function ProductVisual({ product, compact = false }: { product: Product; compact?: boolean }) {
   const style = { "--product-a": product.palette[0], "--product-b": product.palette[1], "--product-c": product.palette[2] } as React.CSSProperties;
   return (
-    <div className={`product-visual ${compact ? "product-visual--compact" : ""}`} style={style} role="img" aria-label={`${product.nameZh}的抽象演示图`}>
-      <span className={`product-shape product-shape--${product.category}`} />
-      <i /><i /><i />
-      <small>DEMO OBJECT · 01</small>
+    <div className={`product-visual ${compact ? "product-visual--compact" : ""}`} style={style}>
+      <Image src={product.image.src} alt={product.image.alt} width={1024} height={1024} sizes={compact ? "(max-width: 479px) 100vw, 50vw" : "(max-width: 767px) 100vw, 50vw"} loading={compact ? "lazy" : "eager"} unoptimized />
+      <span className="product-visual__veil" aria-hidden="true" />
+      <small>SYMBOLIC OBJECT · DEMO</small>
     </div>
   );
 }
@@ -496,11 +524,11 @@ function TodayPage() {
         <section className="section-block"><SectionHeader eyebrow="YOUR PATTERNS" title="生命领域" action="查看全部" href="/life-map" /><div className="domain-grid domain-grid--today">{domains.slice(0, 4).map((domain, index) => <Link href={`/life-map/${domain.id}`} className="domain-card" key={domain.id}><span className="domain-card__index">0{index + 1}</span><small>{domain.nameEn}</small><h3>{domain.nameZh}</h3><p>{domain.pattern}</p><span className={`state state--${domain.state}`}>{domain.state === "active" ? "当前活跃" : domain.state === "steady" ? "稳定主题" : "值得反思"}</span></Link>)}</div></section>
         <section className="timing-card">
           <div><p className="eyebrow">CURRENT SEASON · 当前阶段</p><h2>{timing.title}</h2><p>{timing.summary}</p><Link href="/timing" className="text-link">展开时间线 <span aria-hidden="true">→</span></Link></div>
-          <div className="mini-timeline" aria-label={`当前阶段从 ${timing.start} 至 ${timing.end}`}><span>{timing.start}</span><div><i style={{ left: `${timing.nowPosition * 100}%` }}><b>现在</b></i></div><span>{timing.end}</span></div>
+          <div className="mini-timeline" aria-label={`当前阶段从 ${timing.start} 至 ${timing.end}`}><span>{timing.start}</span><div style={{ "--timeline-position": `${timing.nowPosition * 100}%` } as React.CSSProperties}><i style={{ left: `${timing.nowPosition * 100}%` }}><b>现在</b></i></div><span>{timing.end}</span></div>
         </section>
         <section className="symbol-section">
-          <div className="element-symbol" aria-hidden="true"><span>木</span><i /><i /><i /></div>
-          <div><p className="eyebrow">TODAY&apos;S ELEMENT</p><h2>成长 · 扩张 · 柔韧</h2><p>今天不需要同时长出更多枝条；先选择一条值得持续培育的方向。</p><div className="practice"><span>今日练习</span><p>写下未来七天唯一愿意持续培育的小行动。</p></div></div>
+          <ElementPresenceGraph reading={reading} compact />
+          <div><p className="eyebrow">TODAY&apos;S ELEMENT · 演示解释</p><h2>成长 · 扩张 · 柔韧</h2><p>左侧图表来自你的确定性四柱；这段“木”主题仍是固定演示解释，不代表由数量直接推导出的结论。</p><div className="practice"><span>今日练习</span><p>写下未来七天唯一愿意持续培育的小行动。</p></div></div>
         </section>
         <section className="section-block"><SectionHeader eyebrow="OPTIONAL OBJECT" title="与你的成长主题呼应" /><article className="recommendation-card"><ProductVisual product={featured} /><div className="recommendation-card__content"><div><span className="pill">WOOD · 新开始</span><h2>{featured.nameEn}</h2><h3>{featured.nameZh}</h3><p>{recommendation.summary}</p></div><div className="recommendation-card__footer"><span>{featured.price}</span><Link href={`/objects/${featured.slug}`} className="button button--secondary">为什么推荐给我？</Link></div></div></article></section>
         <section className="recent-questions"><SectionHeader eyebrow="RECENT" title="最近想过的问题" /><Link href="/ask?prompt=我现在适合换工作吗？">我现在适合换工作吗？ <span>→</span></Link><Link href="/ask?prompt=为什么我做一段时间后就想开始新的事情？">为什么我做一段时间后就想开始新的事情？ <span>→</span></Link></section>
@@ -597,7 +625,7 @@ function AskAnswer({ answer, question, onReset }: { answer: AskResponse; questio
 }
 
 function Hexagram({ lines, count = 6 }: { lines: IChingLine[]; count?: number }) {
-  return <div className="hexagram" aria-label={`六爻卦象，已显示 ${count} 爻`}>{lines.slice(0, count).reverse().map((line) => <div key={line.position} className={`hex-line hex-line--${line.polarity} ${line.moving ? "is-moving" : ""}`}><span /><span />{line.moving && <b>○</b>}<small>{line.position}</small></div>)}</div>;
+  return <div className="hexagram" aria-label={`六爻卦象，已显示 ${count} 爻`}>{lines.slice(0, count).reverse().map((line, index) => <div key={line.position} style={{ "--line-delay": `${index * 75}ms` } as React.CSSProperties} className={`hex-line hex-line--${line.polarity} ${line.moving ? "is-moving" : ""}`}><span /><span />{line.moving && <b>○</b>}<small>{line.position}</small></div>)}</div>;
 }
 
 function IChingPage() {
@@ -620,8 +648,8 @@ function TimingPage() {
     <PageShell route="timing">
       <div className="page timing-page">
         <header className="page-heading"><p className="eyebrow">YOUR CURRENT SEASON · 当前时运</p><h1>{timing.title}</h1><p>{timing.summary}</p></header>
-        <section className="timeline-large"><div className="timeline-years"><span>过去</span><span>现在</span><span>近期</span></div><div className="timeline-track"><i style={{ left: `${timing.nowPosition * 100}%` }}><b>NOW</b></i></div><div className="timeline-periods"><article><small>2026.01—06</small><h3>旧结构松动</h3><p>观察什么正在失去意义。</p></article><article className="is-current"><small>{timing.start}—{timing.end}</small><h3>{timing.title}</h3><p>{timing.summary}</p></article><article><small>{timing.nextTransition.date}</small><h3>{timing.nextTransition.title}</h3><p>{timing.nextTransition.summary}</p></article></div></section>
-        <section className="section-block"><SectionHeader eyebrow="DOMAIN ACTIVATION" title="哪些主题正在被强调" /><div className="signal-list">{timing.signals.map((signal) => <article key={signal.id}><div><span>{signal.label}</span><small>{signal.strength === "very-active" ? "很活跃" : signal.strength === "active" ? "活跃" : "出现中"}</small></div><i><b style={{ width: `${signal.internalStrength * 100}%` }} /></i><p>{signal.summary}</p></article>)}</div><p className="inline-notice">{timing.disclaimer}</p></section>
+        <section className="timeline-large"><div className="timeline-years"><span>过去</span><span>现在</span><span>近期</span></div><div className="timeline-track" style={{ "--timeline-position": `${timing.nowPosition * 100}%` } as React.CSSProperties}><i style={{ left: `${timing.nowPosition * 100}%` }}><b>NOW</b></i></div><div className="timeline-periods"><article><small>2026.01—06</small><h3>旧结构松动</h3><p>观察什么正在失去意义。</p></article><article className="is-current"><small>{timing.start}—{timing.end}</small><h3>{timing.title}</h3><p>{timing.summary}</p></article><article><small>{timing.nextTransition.date}</small><h3>{timing.nextTransition.title}</h3><p>{timing.nextTransition.summary}</p></article></div></section>
+        <section className="section-block"><SectionHeader eyebrow="DOMAIN ACTIVATION · 演示" title="哪些主题正在被强调" /><div className="signal-list">{timing.signals.map((signal, index) => <article key={signal.id}><div><span>{signal.label}</span><small>{signal.strength === "very-active" ? "很活跃" : signal.strength === "active" ? "活跃" : "出现中"}</small></div><i><b style={{ "--signal-width": `${signal.internalStrength * 100}%`, "--signal-delay": `${index * 90}ms` } as React.CSSProperties} /></i><p>{signal.summary}</p></article>)}</div><p className="inline-notice">{timing.disclaimer}</p></section>
         <section className="reflection-card"><span aria-hidden="true">时</span><div><p className="eyebrow">THIS SEASON&apos;S PRACTICE</p><h2>为一个真正值得的承诺留出结构</h2><Link href="/ask?prompt=这个阶段我最值得保留什么承诺？" className="button button--primary">围绕当前阶段提问</Link></div></section>
       </div>
     </PageShell>

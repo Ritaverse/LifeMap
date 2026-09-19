@@ -180,6 +180,8 @@ Bottom navigation must account for device safe-area insets. Content needs enough
 - Create symbolic illustrations using thin geometry, crop, negative space, and subtle paper/grain texture.
 - Product photography should use natural daylight, neutral stone/linen/wood surfaces, and honest material detail.
 - If photography is unavailable, use premium abstract placeholders that clearly read as prototype imagery.
+- Product still lifes use the shared ink-green mineral backdrop, soft upper-left light, and a restrained old-gold rim; images must not imply glow, aura, protection, or efficacy.
+- Data graphics use the five element tokens and always pair shape or color with a visible label and numeric value.
 
 ## 7. Motion
 
@@ -201,6 +203,12 @@ Use a restrained ease-out curve such as `cubic-bezier(0.22, 1, 0.36, 1)` for ent
 - Reveal one geometric system at a time.
 - Mark completed stages with a quiet check, line, or fill change.
 - Avoid spinning zodiac wheels, particle explosions, cosmic zooms, and artificial countdowns.
+
+### Ambient and data motion
+
+- Decorative rings may drift slowly (40–55 seconds) when they are not interactive controls.
+- Data bars and timeline traces reveal once from their baseline in 700–1000 ms; the final state must remain readable without motion.
+- Product photography may settle once with a subtle crop change. Never add magical glow, floating particles, or pulsing claims around an object.
 
 ### Reduced motion
 

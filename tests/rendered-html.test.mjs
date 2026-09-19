@@ -41,7 +41,19 @@ test("server-renders the interactive BaZi chart from calculated facts", async ()
   assert.match(html, /日主/);
   assert.match(html, /藏干 · 支内十神/);
   assert.match(html, /数量只描述表层干支/);
+  assert.match(html, /VISIBLE ELEMENTS · 表层五行/);
+  assert.match(html, /表层五行数量：/);
   assert.doesNotMatch(html, /<svg\b/i);
+});
+
+test("server-renders original product imagery with useful alternative text", async () => {
+  const response = await render("/objects");
+  assert.equal(response.status, 200);
+  const html = await response.text();
+  assert.match(html, /\/images\/products\/green-aventurine\.jpg/);
+  assert.match(html, /一块置于深色石台上的天然绿东陵石/);
+  assert.match(html, /\/images\/products\/personal-life-map-art\.jpg/);
+  assert.doesNotMatch(html, /的抽象演示图/);
 });
 
 test("unknown dynamic records render a useful error state", async () => {

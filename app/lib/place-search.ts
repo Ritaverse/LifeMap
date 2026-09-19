@@ -1,3 +1,4 @@
+import { isBirthPlace } from "./bazi.ts";
 import type { BirthPlace } from "./bazi";
 
 const endpoint = "https://geocoding-api.open-meteo.com/v1/search";
@@ -33,7 +34,7 @@ export function mapPlaceSearchPayload(payload: OpenMeteoSearchPayload): BirthPla
     ) return [];
     const admin1 = result.admin1?.trim();
     const label = [result.name.trim(), admin1 && admin1 !== result.name.trim() ? admin1 : null, result.country.trim()].filter(Boolean).join(", ");
-    return [{
+    const place: BirthPlace = {
       id: `open-meteo:${result.id}`,
       label,
       city: result.name.trim(),
@@ -44,7 +45,8 @@ export function mapPlaceSearchPayload(payload: OpenMeteoSearchPayload): BirthPla
       longitude: result.longitude,
       timeZone: result.timezone.trim(),
       source: "open-meteo" as const,
-    }];
+    };
+    return isBirthPlace(place) ? [place] : [];
   });
 }
 
