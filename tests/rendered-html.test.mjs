@@ -24,12 +24,24 @@ test("server-renders the Life Map landing experience", async () => {
   assert.doesNotMatch(html, /codex-preview|react-loading-skeleton/i);
 });
 
-test("server-renders directly addressable Phase 1 routes", async () => {
-  for (const path of ["/today", "/life-map", "/ask", "/iching", "/timing", "/objects", "/me"]) {
+test("server-renders directly addressable product routes", async () => {
+  for (const path of ["/today", "/life-map", "/ask", "/iching", "/timing", "/objects", "/report", "/me"]) {
     const response = await render(path);
     assert.equal(response.status, 200, path);
     assert.match(await response.text(), /Life Map/);
   }
+});
+
+test("server-renders the private multi-page report and $2 Shopify handoff", async () => {
+  const response = await render("/report");
+  assert.equal(response.status, 200);
+  const html = await response.text();
+  assert.match(html, /完整每日反思报告/);
+  assert.match(html, /购买正式 PDF · USD \$2/);
+  assert.match(html, /八页报告已经准备好/);
+  assert.match(html, /Shopify 只接收商品、数量与价格/);
+  assert.match(html, /不是科学预测/);
+  assert.doesNotMatch(html, /storefront-access-token/i);
 });
 
 test("server-renders the interactive BaZi chart from calculated facts", async () => {

@@ -9,10 +9,12 @@ import type { BaziPillar, BaziReading, BirthPlace, FiveElement, PillarKind } fro
 import { searchBirthPlaces } from "../lib/place-search";
 import { clearBirthProfile, readBirthProfile, readOnboardingDraft, writeBirthProfile, writeOnboardingDraft } from "../lib/profile-storage";
 import type { OnboardingDraft } from "../lib/profile-storage";
+import { buildLifeMapReport } from "../lib/report";
 import { getInsight, resolveEvidence, routeAsk } from "../lib/repository";
+import { createReportCheckout } from "../lib/shopify";
 import type { AskResponse, EvidenceRef, IChingLine, Product, SystemId } from "../lib/types";
 
-type RouteName = "landing" | "onboarding" | "generating" | "today" | "insight" | "life-map" | "domain" | "ask" | "iching" | "timing" | "objects" | "product" | "me";
+type RouteName = "landing" | "onboarding" | "generating" | "today" | "insight" | "life-map" | "domain" | "ask" | "iching" | "timing" | "objects" | "product" | "report" | "me";
 
 function Link({ href, ...props }: AnchorHTMLAttributes<HTMLAnchorElement> & { href: string }) {
   return <a href={href} {...props} />;
@@ -46,7 +48,7 @@ function BrandMark({ large = false }: { large?: boolean }) {
 
 function PageShell({ route, title, eyebrow, children, backHref }: { route: RouteName; title?: string; eyebrow?: string; children: ReactNode; backHref?: string }) {
   const hasNav = !["landing", "onboarding", "generating"].includes(route);
-  const activeKey = route === "domain" ? "life-map" : route === "insight" ? "today" : route === "objects" || route === "product" ? "me" : route;
+  const activeKey = route === "domain" ? "life-map" : route === "insight" || route === "report" ? "today" : route === "objects" || route === "product" ? "me" : route;
   return (
     <div className={`app-shell ${hasNav ? "app-shell--nav" : ""}`}>
       {hasNav && (
@@ -496,6 +498,21 @@ function GeneratingPage() {
   );
 }
 
+function ReportOffer({ compact = false }: { compact?: boolean }) {
+  return (
+    <section className={`report-offer ${compact ? "report-offer--compact" : ""}`}>
+      <div className="report-offer__folio" aria-hidden="true"><span>08</span><i /><i /><i /></div>
+      <div>
+        <p className="eyebrow">PRIVATE PDF · 完整报告</p>
+        <h2>把你的四柱事实与反思练习，整理成一份私人报告</h2>
+        <p>八页双语式阅读体验：计算说明、四柱结构、表层五行、传统反思角度与七日练习。出生资料只留在浏览器。</p>
+        <div className="report-offer__meta"><span>8 pages</span><span>本地生成</span><strong>USD $2</strong></div>
+        <Link href="/report" className="button button--primary">预览并购买完整报告 <span aria-hidden="true">→</span></Link>
+      </div>
+    </section>
+  );
+}
+
 function TodayPage() {
   const reading = useActiveBaziReading();
   const today = insights[0];
@@ -514,6 +531,7 @@ function TodayPage() {
           <div className="evidence-chips">{today.evidence.map((item) => <EvidenceChip key={item.factId} system={item.system} role={item.role} />)}</div>
           <Link href={`/insights/${today.id}`} className="button button--ink">为什么？查看依据 <span aria-hidden="true">↗</span></Link>
         </section>
+        <ReportOffer />
         <section className="section-block">
           <SectionHeader eyebrow="REFLECT" title="从一个问题开始" />
           <div className="quick-grid">
@@ -656,6 +674,77 @@ function TimingPage() {
   );
 }
 
+function ReportPage() {
+  const reading = useActiveBaziReading();
+  const report = useMemo(() => buildLifeMapReport(reading), [reading]);
+  const [checkoutState, setCheckoutState] = useState<"idle" | "loading" | "error">("idle");
+  const [checkoutMessage, setCheckoutMessage] = useState("");
+  const storefrontConfigured = Boolean(process.env.NEXT_PUBLIC_SHOPIFY_STOREFRONT_TOKEN?.trim());
+
+  const beginCheckout = async () => {
+    setCheckoutState("loading");
+    setCheckoutMessage("");
+    try {
+      const checkout = await createReportCheckout();
+      sessionStorage.setItem("life-map-report-checkout-started", JSON.stringify({ product: "full-daily-reflection", amount: checkout.amount, currency: checkout.currencyCode }));
+      window.location.assign(checkout.checkoutUrl);
+    } catch (error) {
+      setCheckoutState("error");
+      setCheckoutMessage(error instanceof Error ? error.message : "暂时无法连接 Shopify 结账，请稍后重试。");
+    }
+  };
+
+  return (
+    <PageShell route="report" title="完整报告" eyebrow="PRIVATE PDF" backHref="/today">
+      <div className="page report-page">
+        <header className="report-intro">
+          <div>
+            <p className="eyebrow">YOUR PRIVATE EDITION · 私人版本</p>
+            <h1>{report.title}</h1>
+            <p>报告已在当前浏览器内根据你的确定性四柱事实生成。Shopify 只接收商品、数量与价格，不接收任何出生资料或命盘内容。</p>
+            <div className="report-intro__actions">
+              <button className="button button--primary" type="button" onClick={beginCheckout} disabled={checkoutState === "loading"}>
+                {checkoutState === "loading" ? "正在连接 Shopify…" : "购买正式 PDF · USD $2"}
+              </button>
+              <button className="button button--secondary" type="button" onClick={() => window.print()}>保存本地预览</button>
+              <a className="button button--tertiary" href="/downloads/life-map-full-daily-report-sample.pdf" download>下载演示 PDF</a>
+            </div>
+            <p className="report-privacy">安全结账由 Shopify 提供。此版本不会把姓名、生日、出生时间、地点或四柱写入订单。</p>
+            {!storefrontConfigured && <p className="inline-notice">商店目前使用受保护的预览模式；Shopify 可能先显示店铺密码页。正式上线前需在 Shopify 后台解除 Online Store 密码，或配置公开 Storefront token。</p>}
+            {checkoutState === "error" && <p className="inline-notice" role="alert">{checkoutMessage}</p>}
+          </div>
+          <aside className="report-purchase-card" aria-label="报告商品摘要">
+            <span>FULL REPORT</span>
+            <strong>$2</strong>
+            <small>USD · DIGITAL PRODUCT</small>
+            <dl><div><dt>页数</dt><dd>{report.pages.length}</dd></div><div><dt>引擎</dt><dd>v{reading.engine.version}</dd></div><div><dt>隐私</dt><dd>Browser only</dd></div></dl>
+          </aside>
+        </header>
+
+        <div className="report-boundary"><span>FACT</span><p>命盘事实来自版本化引擎</p><span>REFLECTION</span><p>传统主题是可质疑的观察角度</p><span>PRACTICE</span><p>练习不需要购买任何物品</p></div>
+
+        <section className="report-preview" aria-label="完整报告预览">
+          <div className="report-preview__heading"><p className="eyebrow">MULTI-PAGE PREVIEW</p><h2>八页报告已经准备好</h2><p>购买的是这份正式数字版报告；当前页面同时作为隐私优先的本地生成预览。</p></div>
+          {report.pages.map((page) => (
+            <article className={`report-sheet report-sheet--${page.id}`} key={page.id}>
+              <header>
+                <span>{page.eyebrow}</span>
+                <small>{String(page.number).padStart(2, "0")} / {String(report.pages.length).padStart(2, "0")}</small>
+              </header>
+              <div className="report-sheet__title"><h2>{page.title}</h2><p>{page.subtitle}</p></div>
+              {page.id === "cover" && <div className="report-cover-mark" aria-label={`日主 ${reading.dayMaster.stem}`}><i /><strong>{reading.dayMaster.stem}</strong><span>{reading.dayMaster.polarity}{reading.dayMaster.element}</span></div>}
+              {page.id === "elements" && <div className="report-element-bars" role="img" aria-label={elementOrder.map((element) => `${element} ${reading.visibleElementCounts[element]}`).join("，")}>{elementOrder.map((element) => <div key={element}><span>{element}<small>{elementEnglish[element]}</small></span><i><b style={{ width: `${(reading.visibleElementCounts[element] / Math.max(1, ...Object.values(reading.visibleElementCounts))) * 100}%`, "--element-color": elementColor[element] } as React.CSSProperties} /></i><strong>{reading.visibleElementCounts[element]}</strong></div>)}</div>}
+              <div className="report-sheet__blocks">{page.blocks.map((block) => <section className={`report-block report-block--${block.kind}`} key={block.id}><span>{block.label}</span><h3>{block.title}</h3><p>{block.body}</p></section>)}</div>
+              <footer><span>Life Map · Personal reflection</span><b>{report.generatedOn}</b></footer>
+            </article>
+          ))}
+        </section>
+        <section className="report-final-cta"><p className="eyebrow">READY WHEN YOU ARE</p><h2>保留一份属于你的私人记录</h2><p>{report.disclaimer}</p><button className="button button--primary" type="button" onClick={beginCheckout} disabled={checkoutState === "loading"}>购买正式 PDF · USD $2</button></section>
+      </div>
+    </PageShell>
+  );
+}
+
 function ObjectsPage() {
   return (
     <PageShell route="objects" title="象征物 / Objects" eyebrow="OPTIONAL RITUALS" backHref="/me">
@@ -688,7 +777,7 @@ function MePage() {
         <header className="profile-hero"><div className="profile-monogram">{reading.profile.displayName.slice(0, 1).toUpperCase()}</div><div><p className="eyebrow">YOUR PRIVATE SPACE · 你的内在空间</p><h1>{reading.profile.displayName}</h1><p>八字已计算 · 其他体系仍为演示</p></div></header>
         <section className="profile-card"><SectionHeader eyebrow="BIRTH PROFILE" title="出生信息" /><dl><div><dt>出生日期</dt><dd>{reading.profile.birthDate}</dd></div><div><dt>出生时间</dt><dd>{reading.profile.birthTime ?? "未知"}</dd></div><div><dt>出生地点</dt><dd>{reading.place.label}</dd></div><div><dt>时区</dt><dd>{reading.place.timeZone}</dd></div><div><dt>状态</dt><dd><span className="calculation-label">八字已排盘</span></dd></div></dl><Link href="/onboarding" className="text-link">重新输入资料 →</Link></section>
         <BaziChartCard reading={reading} />
-        <section className="menu-list"><Link href="/objects"><span>象征物收藏</span><small>查看所有演示物品</small><b>→</b></Link><button disabled><span>关系档案</span><small>后续阶段开放</small><b>即将开放</b></button><button disabled><span>通知与每日提醒</span><small>后续阶段开放</small><b>即将开放</b></button></section>
+        <section className="menu-list"><Link href="/report"><span>完整每日报告</span><small>生成八页私人 PDF · USD $2</small><b>→</b></Link><Link href="/objects"><span>象征物收藏</span><small>查看所有演示物品</small><b>→</b></Link><button disabled><span>关系档案</span><small>后续阶段开放</small><b>即将开放</b></button><button disabled><span>通知与每日提醒</span><small>后续阶段开放</small><b>即将开放</b></button></section>
         <section className="trust-card"><p className="eyebrow">TRUST & PRIVACY</p><h2>你的信息，只留在这次浏览会话</h2><p>出生资料只保存在当前浏览器会话中，不会上传、写入账户或发送分析事件。关闭会话后浏览器会清除它。</p><ul><li>八字四柱由确定性引擎在浏览器内计算</li><li>紫微、西占与综合解释仍明确标注为演示</li><li>没有实时 AI、支付或追踪</li></ul><button className="text-button text-button--danger" onClick={clearProfile}>清除本次出生资料</button></section>
       </div>
     </PageShell>
@@ -709,6 +798,7 @@ export function LifeMapApp({ initialRoute, resourceId }: { initialRoute: RouteNa
     case "timing": return <TimingPage />;
     case "objects": return <ObjectsPage />;
     case "product": return <ProductPage id={resourceId} />;
+    case "report": return <ReportPage />;
     case "me": return <MePage />;
   }
 }
