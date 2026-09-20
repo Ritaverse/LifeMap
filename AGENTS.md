@@ -178,7 +178,7 @@ Do not stop after scaffolding if a safe path remains to complete and verify the 
 
 ## Visual Quality Bar
 
-The intended tone is **Ink Nocturne × Personal Ritual**: intimate, spiritual, tactile, quietly mysterious, and contemporary. Use deep ink surfaces, moon-paper typography, fine mineral borders, and restrained jade, muted-gold, and cinnabar geometry. Avoid purple galaxy backgrounds, glowing crystal clichés, generic glassmorphism, dragons, excessive zodiac ornament, faux-ancient textures, and casino-like “luck scores.”
+The intended tone is **Celestial Violet × Personal Constellation**: intimate, spiritual, quietly mysterious, and contemporary. Use layered violet night surfaces, sparse animated starlight, soft Chinese-first sans typography, fine lavender borders, and restrained rose, sky-blue, and warm-star accents. Keep the star field atmospheric and readable rather than neon or decorative noise. Avoid glowing-crystal clichés, copied zodiac artwork, dragons, excessive ornament, faux-ancient textures, and casino-like “luck scores.”
 
 The UI must feel designed with images disabled. Typography, spacing, composition, borders, and hierarchy do the core visual work. Follow `DESIGN_SYSTEM.md`, including centralized palette and spacing tokens, Chinese-first typography, 44 px touch targets, WCAG 2.2 AA where practical, and responsive checks near 320/375, 768, and 1280 px.
 

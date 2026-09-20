@@ -2,27 +2,27 @@
 
 ## 1. Creative Direction
 
-**Ink Nocturne × Personal Ritual**
+**Celestial Violet × Personal Constellation**
 
-Life Map should feel like opening a private night journal: intimate, contemplative, spiritual, and quietly mysterious. Its identity comes from deep ink surfaces, moon-paper typography, dim metallic accents, fine lines, and restrained symbolic geometry—not from spectacle or generic wellness branding.
+Life Map should feel like entering a private observatory: intimate, contemplative, spiritual, and quietly mysterious. Its identity comes from layered violet night surfaces, sparse moving starlight, soft lunar typography, fine orbit lines, and Life Map’s own symbolic geometry—not from spectacle or generic wellness branding.
 
 Desired qualities:
 
-- Nocturnal, not gloomy
+- Celestial, not theatrical
 - Spiritual, not supernatural
 - Cultural, not ornamental
-- Editorial, not austere
+- Personal, not corporate
 - Premium, not precious
-- Personal, not clinical
+- Soft, not childish
 
 Avoid:
 
-- Purple galaxy or star-field backgrounds
+- Dense neon galaxies or high-speed particle effects
 - Glowing crystals and neon aura effects
-- Dragons, talismans, zodiac animals, or Bagua used as decoration
+- Copied zodiac wheels, dragons, talismans, or Bagua used as decoration
 - Fake parchment and distressed “ancient” textures
 - Heavy gold gradients
-- Glassmorphism as a default card treatment
+- Transparent cards that reduce text contrast
 - Luck meters, five-star fortune ratings, red/green fate scores
 - Dense dashboards of specialist notation on primary screens
 
@@ -43,32 +43,32 @@ Combine no more than two motifs in a single composition. Geometry should serve h
 
 | Token | Value | Use |
 |---|---:|---|
-| `--color-canvas` | `#0B1112` | Deep ink page background |
-| `--color-surface` | `#141C1D` | Raised reading cards and sheets |
-| `--color-surface-strong` | `#1C2725` | Selected or ritual-focused surface |
-| `--color-ink` | `#F2E8D4` | Primary moon-paper text |
-| `--color-ink-soft` | `#C8BDA8` | Secondary text |
-| `--color-ink-muted` | `#958D7F` | Metadata and tertiary labels |
-| `--color-line` | `#2B3735` | Dividers and card borders |
-| `--color-line-strong` | `#46534F` | Emphasized dividers and inputs |
-| `--color-jade` | `#86AA98` | Living, reflective accent |
-| `--color-jade-deep` | `#B9D0C3` | High-contrast jade text |
-| `--color-jade-soft` | `#1A2B27` | Tinted supporting surfaces |
-| `--color-cinnabar` | `#C76D59` | Seals, moving lines, and special marks |
-| `--color-cinnabar-soft` | `#2B1C1A` | Subtle tension surface |
-| `--color-gold-muted` | `#C4A46D` | Ritual markers and fine metallic details |
-| `--color-focus` | `#F1C66D` | Accessible keyboard focus ring |
-| `--color-error` | `#E68B7B` | Validation and errors |
-| `--color-success` | `#91B6A3` | Completed states |
+| `--color-canvas` | `#160E2F` | Deep violet night background |
+| `--color-surface` | `#261942` | Reading cards and sheets |
+| `--color-surface-strong` | `#352354` | Selected or ritual-focused surface |
+| `--color-ink` | `#FBF8FF` | Primary lunar-white text |
+| `--color-ink-soft` | `#DDD4ED` | Secondary text |
+| `--color-ink-muted` | `#B3A7CA` | Metadata and tertiary labels |
+| `--color-line` | `#4A376A` | Dividers and card borders |
+| `--color-line-strong` | `#765BA0` | Emphasized dividers and inputs |
+| `--color-jade` | `#8ED8ED` | Sky-blue evidence and chart accent |
+| `--color-jade-deep` | `#C6F2FF` | High-contrast sky text |
+| `--color-jade-soft` | `#253451` | Tinted supporting surfaces |
+| `--color-cinnabar` | `#F293D5` | Ritual rose, moving lines, special marks |
+| `--color-cinnabar-soft` | `#482344` | Subtle tension surface |
+| `--color-gold-muted` | `#E1B9FF` | Starlight markers and orbit details |
+| `--color-focus` | `#FFD56E` | Accessible keyboard focus ring |
+| `--color-error` | `#FF9DA8` | Validation and errors |
+| `--color-success` | `#91E0C0` | Completed states |
 
 ### Usage ratio
 
-- 70–80% ink canvas and dark mineral surfaces
-- 15–20% moon-paper text and line work
-- 5–10% jade
-- Less than 3% cinnabar or muted gold
+- 65–75% violet canvas and opaque reading surfaces
+- 15–20% lunar-white text and lavender line work
+- 5–10% sky blue
+- Less than 5% ritual rose or bright starlight
 
-Jade carries interaction and reflection. Muted gold establishes the ritual rhythm; cinnabar should feel like a seal or annotation, never a broad brand wash.
+Rose-to-violet gradients are reserved for primary actions. Sky blue carries calculated evidence and chart state; pale violet establishes the celestial rhythm. Keep starlight sparse enough that long-form reading remains calm.
 
 ### Contrast
 
@@ -80,13 +80,14 @@ Jade carries interaction and reflection. Muted gold establishes the ritual rhyth
 
 ### Font roles
 
-Use an editorial serif for evocative titles, theme words, hexagram names, and chart moments. Use a clean sans serif for navigation, controls, body text, and data.
+Use a soft Chinese-first sans serif for titles, navigation, controls, and body text. Reserve a traditional serif only for calculated symbols such as stems, branches, palace stars, and hexagram names. This keeps the product personal and contemporary without erasing its source traditions.
 
 Preferred stacks:
 
 ```css
---font-editorial: "Noto Serif SC", "Source Han Serif SC", "Songti SC", Georgia, serif;
---font-ui: Inter, "Noto Sans SC", "Source Han Sans SC", "PingFang SC", system-ui, sans-serif;
+--font-editorial: ui-rounded, "SF Pro Rounded", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+--font-ui: Inter, "Noto Sans SC", "Source Han Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+--font-symbol: "Noto Serif SC", "Source Han Serif SC", "Songti SC", Georgia, serif;
 ```
 
 If external font loading is not already configured, use system fallbacks first. Do not block the prototype on font licensing or network-loaded assets.
@@ -109,7 +110,7 @@ Chinese body copy needs generous line height. Avoid wide letter spacing in Chine
 
 ### Rules
 
-- Serif is for meaning, not every heading.
+- Sans is the default; serif is limited to system symbols and traditional names.
 - Use no more than three font weights per family.
 - Limit hero prose to 16–22 Chinese characters per line on typical mobile widths when possible.
 - Avoid centered body paragraphs longer than two lines.
@@ -149,12 +150,12 @@ Cards should generally use 18–28 px radius. Large ritual moments may use 42 px
 
 ### Borders and shadows
 
-Prefer a fine mineral border and a faint inner highlight. Shadows should create depth in the dark canvas without making cards float like dashboard widgets.
+Prefer a fine lavender border and a faint inner highlight. Shadows may carry a very soft violet tint, but should create depth without making cards feel like dashboard widgets.
 
 ```css
---shadow-soft: 0 18px 50px rgb(0 0 0 / 22%);
---shadow-overlay: 0 24px 80px rgb(0 0 0 / 48%);
---shadow-inner: inset 0 1px 0 rgb(242 232 212 / 6%);
+--shadow-soft: 0 22px 60px rgb(8 3 24 / 28%), 0 0 42px rgb(136 86 216 / 8%);
+--shadow-overlay: 0 28px 90px rgb(7 2 22 / 52%), 0 0 54px rgb(144 86 225 / 10%);
+--shadow-inner: inset 0 1px 0 rgb(251 248 255 / 10%);
 ```
 
 Use `--shadow-soft` only on important raised cards, product imagery, and floating navigation. Most cards should use a 1 px `--color-line` border.
@@ -177,15 +178,15 @@ Bottom navigation must account for device safe-area insets. Content needs enough
 - Use a consistent 1.5–1.75 px line icon family.
 - Default icon sizes: 18, 20, and 24 px.
 - Avoid filled emoji as production icons.
-- Create symbolic illustrations using thin geometry, crop, negative space, and subtle paper/grain texture.
+- Create symbolic illustrations using thin orbit geometry, constellation points, crop, and negative space.
 - Product photography should use natural daylight, neutral stone/linen/wood surfaces, and honest material detail.
 - If photography is unavailable, use premium abstract placeholders that clearly read as prototype imagery.
-- Product still lifes use the shared ink-green mineral backdrop, soft upper-left light, and a restrained old-gold rim; images must not imply glow, aura, protection, or efficacy.
+- Product still lifes use a shared violet mineral backdrop, soft upper-left light, and a restrained lavender rim; images must not imply aura, protection, or efficacy.
 - Data graphics use the five element tokens and always pair shape or color with a visible label and numeric value.
 
 ## 7. Motion
 
-Motion should feel measured and ceremonial, never magical or distracting.
+Motion should feel slow, atmospheric, and measured, never magical or distracting.
 
 ### Durations
 
@@ -202,13 +203,14 @@ Use a restrained ease-out curve such as `cubic-bezier(0.22, 1, 0.36, 1)` for ent
 
 - Reveal one geometric system at a time.
 - Mark completed stages with a quiet check, line, or fill change.
-- Avoid spinning zodiac wheels, particle explosions, cosmic zooms, and artificial countdowns.
+- Avoid particle explosions, cosmic zooms, and artificial countdowns.
 
 ### Ambient and data motion
 
-- Decorative rings may drift slowly (40–55 seconds) when they are not interactive controls.
+- Decorative rings may drift slowly (34–55 seconds) when they are not interactive controls.
+- Background stars may drift over 45–70 seconds and twinkle over 5–12 seconds. Keep points sparse and 1–2 px at normal density.
 - Data bars and timeline traces reveal once from their baseline in 700–1000 ms; the final state must remain readable without motion.
-- Product photography may settle once with a subtle crop change. Never add magical glow, floating particles, or pulsing claims around an object.
+- Product photography may settle once with a subtle crop change. Never add magical glow or pulsing claims around an object.
 
 ### Reduced motion
 
@@ -223,7 +225,7 @@ When `prefers-reduced-motion: reduce` is enabled:
 
 ### 8.1 App shell
 
-`AppShell` manages the ink canvas, max width, safe areas, and persistent navigation. A very faint orbital field may sit behind content, but it must never reduce text contrast or become a star-field effect.
+`AppShell` manages the violet canvas, max width, safe areas, and persistent navigation. Two or three sparse CSS star layers may sit behind content. They must never intercept input, trigger horizontal overflow, or reduce reading contrast.
 
 ### 8.2 Top bar
 
@@ -237,16 +239,16 @@ When `prefers-reduced-motion: reduce` is enabled:
 - Five destinations: Today, Life Map, Ask, Timing, Me
 - Use one centered floating dock on mobile and desktop so the product feels like a personal instrument rather than a dashboard sidebar
 - Ask may receive a distinctive central mark, but must not become an oversized floating novelty button
-- Active state uses moon-paper text plus a muted-gold indicator; inactive state uses muted ink
+- Active state uses lunar-white text plus a rose-to-sky indicator; inactive state uses muted lavender
 - Label remains visible; do not rely on icons alone
 - Minimum target size: 44 × 44 px
 
 ### 8.4 Buttons
 
-**Primary:** jade background, warm-white text, minimum 48 px height  
-**Secondary:** dark mineral surface, 1 px strong border, moon-paper text
-**Tertiary:** text with arrow or underline on hover  
-**Destructive:** reserved for data removal; not needed in the primary demo
+- **Primary:** rose-to-violet gradient, white text, minimum 48 px height.
+- **Secondary:** opaque violet surface, 1 px strong border, lunar-white text.
+- **Tertiary:** text with arrow or underline on hover.
+- **Destructive:** reserved for data removal; not needed in the primary demo.
 
 Buttons use sentence case. Disabled states must remain legible and explain why when the action matters.
 
@@ -262,8 +264,8 @@ Buttons use sentence case. Disabled states must remain legible and explain why w
 
 Base style:
 
-- Dark mineral surface with an optional quiet radial tint
-- 1 px neutral border
+- Opaque violet vellum with an optional quiet radial tint
+- 1 px lavender border
 - 18–28 px radius
 - 20–24 px internal padding on mobile
 - Optional eyebrow, title, body, metadata, and footer action
@@ -273,9 +275,9 @@ Cards should not all have identical visual weight. Use borderless grouped sectio
 ### 8.7 Today hero
 
 - Tallest and most spacious card on Today
-- Deep jade-black surface with one warm radial glow
+- Deep violet surface with one soft lilac radial glow
 - A small geometric motif may sit at an edge, not behind body copy
-- Theme title uses the editorial serif
+- Theme title uses the rounded display sans
 - Evidence chips sit below the summary
 - “为什么？” is visible without scrolling on common mobile heights when practical
 
@@ -283,8 +285,8 @@ Cards should not all have identical visual weight. Use borderless grouped sectio
 
 Variants:
 
-- `primary`: jade tint, solid system mark, label
-- `supporting`: neutral surface, jade outline or dot, label
+- `primary`: sky-blue tint, solid system mark, label
+- `supporting`: neutral surface, sky outline or dot, label
 - `context`: neutral surface, muted outline, label
 
 Labels:
@@ -311,7 +313,7 @@ Contains domain name, English label, one short pattern/status, and restrained di
 ### 8.11 Timing preview
 
 - Show a thin horizontal track with past, current point, and near future
-- Current point is emphasized with jade and a textual “现在” label
+- Current point is emphasized with sky blue and a textual “现在” label
 - Title and one sentence are more important than the visualization
 - Use activation bars only with explicit qualitative labels
 
@@ -337,7 +339,7 @@ Do not hide uncertainty or missing birth-time limitations.
 - Three coins can be abstract discs, not photorealistic ancient coins.
 - Include a text-accessible “第 1 次，共 6 次” status.
 - Build hexagram lines from bottom to top.
-- Moving lines use cinnabar plus a symbol; never color alone.
+- Moving lines use ritual rose plus a symbol; never color alone.
 - Provide restart and skip-to-demo-result actions in development/demo mode.
 
 ### 8.15 Product recommendation card
@@ -442,26 +444,27 @@ Codex may adapt naming to the chosen framework, but centralize equivalent values
 
 ```css
 :root {
-  --color-canvas: #0b1112;
-  --color-surface: #141c1d;
-  --color-surface-strong: #1c2725;
-  --color-ink: #f2e8d4;
-  --color-ink-soft: #c8bda8;
-  --color-ink-muted: #958d7f;
-  --color-line: #2b3735;
-  --color-line-strong: #46534f;
-  --color-jade: #86aa98;
-  --color-jade-deep: #b9d0c3;
-  --color-jade-soft: #1a2b27;
-  --color-cinnabar: #c76d59;
-  --color-cinnabar-soft: #2b1c1a;
-  --color-gold-muted: #c4a46d;
-  --color-focus: #f1c66d;
-  --color-error: #e68b7b;
-  --color-success: #91b6a3;
+  --color-canvas: #160e2f;
+  --color-surface: #261942;
+  --color-surface-strong: #352354;
+  --color-ink: #fbf8ff;
+  --color-ink-soft: #ddd4ed;
+  --color-ink-muted: #b3a7ca;
+  --color-line: #4a376a;
+  --color-line-strong: #765ba0;
+  --color-jade: #8ed8ed;
+  --color-jade-deep: #c6f2ff;
+  --color-jade-soft: #253451;
+  --color-cinnabar: #f293d5;
+  --color-cinnabar-soft: #482344;
+  --color-gold-muted: #e1b9ff;
+  --color-focus: #ffd56e;
+  --color-error: #ff9da8;
+  --color-success: #91e0c0;
 
-  --font-editorial: "Noto Serif SC", "Source Han Serif SC", "Songti SC", Georgia, serif;
-  --font-ui: Inter, "Noto Sans SC", "Source Han Sans SC", "PingFang SC", system-ui, sans-serif;
+  --font-editorial: ui-rounded, "SF Pro Rounded", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  --font-ui: Inter, "Noto Sans SC", "Source Han Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  --font-symbol: "Noto Serif SC", "Source Han Serif SC", "Songti SC", Georgia, serif;
 
   --radius-sm: 10px;
   --radius-md: 18px;
@@ -469,9 +472,9 @@ Codex may adapt naming to the chosen framework, but centralize equivalent values
   --radius-xl: 42px;
   --radius-pill: 999px;
 
-  --shadow-soft: 0 18px 50px rgb(0 0 0 / 22%);
-  --shadow-overlay: 0 24px 80px rgb(0 0 0 / 48%);
-  --shadow-inner: inset 0 1px 0 rgb(242 232 212 / 6%);
+  --shadow-soft: 0 22px 60px rgb(8 3 24 / 28%), 0 0 42px rgb(136 86 216 / 8%);
+  --shadow-overlay: 0 28px 90px rgb(7 2 22 / 52%), 0 0 54px rgb(144 86 225 / 10%);
+  --shadow-inner: inset 0 1px 0 rgb(251 248 255 / 10%);
 }
 ```
 
