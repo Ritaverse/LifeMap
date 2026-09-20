@@ -34,13 +34,13 @@ Treat these documents as the product source of truth. If implementation code exi
 
 ## Current Phase
 
-Phase 2A is the active slice: **deterministic BaZi calculation foundations and real birth-location search** layered onto the validated Phase 1 experience.
+Phase 2E is the active slice: **deterministic multi-system calculation and evidence-grounded rule synthesis** layered onto the validated Phase 1 experience.
 
 The current vertical slice is:
 
-> Birth onboarding → normalized local birth profile → versioned BaZi engine → structured Four Pillars facts → clearly separated demo interpretation
+> Birth onboarding → normalized local birth profile → versioned BaZi, Zi Wei, and Western engines → dated timing facts → traceable rule synthesis
 
-Real BaZi calculation and explicit city/country geocoding through the approved location adapter are authorized in Phase 2A. Keep Zi Wei, Western ephemeris/transits, live AI, historical timezone resolution, payments, and authentication out of this slice. Never send a name, birth date, or birth time to the geocoding provider. Do not present Phase 1 fixture interpretations as conclusions derived from a newly calculated chart.
+Real BaZi, Zi Wei, Western natal, Western transit, historical IANA timezone, current-period, and deterministic rule-synthesis calculations are authorized. The $2 Shopify report checkout is also in scope. Keep live AI, authentication, server-side birth-profile storage, and event prediction out of this slice. Never send a name, birth date, or birth time to the geocoding provider or Shopify. Do not present fixture interpretations as conclusions derived from calculated charts.
 
 ## Working Priorities
 
@@ -190,16 +190,17 @@ Recent history uses concise Conventional Commit-style subjects such as `feat: ad
 
 Never commit secrets or personal data. Store local values in ignored `.env` files and provide a safe `.env.example` containing names and placeholders only. Validate external input and review new dependencies before adoption. Phase 1 must contain no production credentials, analytics, payment, real chart, or live AI integrations.
 
-## Definition of Done for Phase 2A
+## Definition of Done for Phase 2E
 
 Phase 2A is complete only when:
 
 - A selected global city produces a validated country, coordinate, and IANA-timezone record.
-- Supported birth inputs produce deterministic, versioned Four Pillars output.
-- Unknown birth time omits the time pillar and exposes boundary limitations.
-- Calculation rules and engine version are visible to the user.
-- The Life Map chart is driven only by engine facts and exposes pillar details accessibly.
-- Calculated facts remain visually and structurally separate from fixture interpretation.
+- Supported birth inputs produce deterministic, versioned BaZi, Zi Wei, and Western outputs.
+- Unknown birth time omits the BaZi time pillar, Zi Wei palaces, and Western angles/houses while preserving date-safe facts.
+- Historical IANA timezone resolution, calculation conventions, engine versions, and target dates are visible.
+- Life Map and Timing visualizations are driven only by engine facts and expose details accessibly.
+- Every synthesized insight references stable calculated evidence IDs; consensus requires two or more systems and tension remains visible.
+- The purchased report covers all calculated systems, timing, synthesis, and limitations without sending birth data to Shopify.
 - Sensitive inputs stay in the current browser session and can be cleared.
 - Known-result, boundary, invalid-input, type, lint, route, and build checks pass.
 

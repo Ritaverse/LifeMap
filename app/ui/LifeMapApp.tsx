@@ -3,16 +3,19 @@
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import type { AnchorHTMLAttributes, FormEvent, ReactNode } from "react";
-import { askResponses, domains, iching, insights, products, recommendation, timing } from "../lib/data";
+import { askResponses, iching, products, recommendation } from "../lib/data";
 import { calculateBazi, defaultBirthPlace, demoBaziReading, demoBirthProfile } from "../lib/bazi";
 import type { BaziPillar, BaziReading, BirthPlace, FiveElement, PillarKind } from "../lib/bazi";
+import { buildCalculatedExperience, localDateString, resolveCalculatedEvidence, routeCalculatedAsk } from "../lib/experience";
+import type { CalculatedExperience } from "../lib/experience";
 import { searchBirthPlaces } from "../lib/place-search";
 import { clearBirthProfile, readBirthProfile, readOnboardingDraft, writeBirthProfile, writeOnboardingDraft } from "../lib/profile-storage";
 import type { OnboardingDraft } from "../lib/profile-storage";
 import { buildLifeMapReport } from "../lib/report";
-import { getInsight, resolveEvidence, routeAsk } from "../lib/repository";
 import { createReportCheckout } from "../lib/shopify";
 import type { AskResponse, EvidenceRef, IChingLine, Product, SystemId } from "../lib/types";
+import type { WesternReading } from "../lib/western";
+import type { ZiweiReading } from "../lib/ziwei";
 
 type RouteName = "landing" | "onboarding" | "generating" | "today" | "insight" | "life-map" | "domain" | "ask" | "iching" | "timing" | "objects" | "product" | "report" | "me";
 
@@ -103,6 +106,22 @@ function useActiveBaziReading() {
   return reading;
 }
 
+function useActiveExperience() {
+  const reading = useActiveBaziReading();
+  const [targetDate, setTargetDate] = useState(() => new Date().toISOString().slice(0, 10));
+  useEffect(() => {
+    const localDate = localDateString();
+    if (localDate !== targetDate) queueMicrotask(() => setTargetDate(localDate));
+  }, [targetDate]);
+  return useMemo(() => {
+    try {
+      return { reading, experience: buildCalculatedExperience(reading, targetDate), calculationError: null as string | null };
+    } catch (error) {
+      return { reading, experience: null, calculationError: error instanceof Error ? error.message : "命盘计算失败" };
+    }
+  }, [reading, targetDate]);
+}
+
 const elementEnglish: Record<FiveElement, string> = { 木: "WOOD", 火: "FIRE", 土: "EARTH", 金: "METAL", 水: "WATER" };
 const elementOrder: FiveElement[] = ["木", "火", "土", "金", "水"];
 const elementColor: Record<FiveElement, string> = {
@@ -113,11 +132,12 @@ const elementColor: Record<FiveElement, string> = {
   水: "var(--color-element-water)",
 };
 
-function PhaseScopeNotice() {
+function PhaseScopeNotice({ experience }: { experience: CalculatedExperience }) {
+  const ziweiStatus = experience.ziwei.status === "calculated" ? "紫微十二宫已排盘" : "紫微因出生时间未知而省略";
   return (
     <aside className="phase-scope" aria-label="当前计算范围">
-      <span>体验边界</span>
-      <p><strong>八字四柱已启用真实计算。</strong> 紫微、西占、时运与综合洞察目前仍是固定演示内容，不会混作你的真实结果。</p>
+      <span>计算状态</span>
+      <p><strong>八字、西占与当前时运均来自版本化计算。</strong> {ziweiStatus}；综合洞察由可复算规则连接证据，不调用实时 AI，也不作结果保证。</p>
     </aside>
   );
 }
@@ -241,8 +261,8 @@ function EvidenceChip({ system, role }: { system: SystemId; role: "primary" | "s
   return <span className={`evidence-chip evidence-chip--${role}`} aria-label={`${systemLabels[system].full}，${role === "primary" ? "主要依据" : role === "supporting" ? "支持依据" : "背景信息"}`}><i aria-hidden="true" />{systemLabels[system].short}</span>;
 }
 
-function EvidenceList({ evidence }: { evidence: EvidenceRef[] }) {
-  const resolved = resolveEvidence(evidence);
+function EvidenceList({ evidence, experience }: { evidence: EvidenceRef[]; experience: CalculatedExperience }) {
+  const resolved = resolveCalculatedEvidence(experience, evidence);
   return (
     <div className="evidence-list">
       {resolved.map(({ fact, contribution, role }) => (
@@ -256,11 +276,58 @@ function EvidenceList({ evidence }: { evidence: EvidenceRef[] }) {
             <div><span>命盘事实</span><p>{fact.rawLabel}</p></div>
             <div><span>传统解释</span><p>{fact.traditionalInterpretation}</p></div>
             <div><span>综合作用</span><p>{contribution}</p></div>
-            {fact.limitations && <p className="inline-notice">演示限制：{fact.limitations}</p>}
+            {fact.limitations && <p className="inline-notice">计算边界：{fact.limitations}</p>}
           </div>
         </details>
       ))}
     </div>
+  );
+}
+
+const ziweiGridAreas = ["4 / 1", "4 / 2", "4 / 3", "4 / 4", "3 / 4", "2 / 4", "1 / 4", "1 / 3", "1 / 2", "1 / 1", "2 / 1", "3 / 1"];
+
+function ZiweiChartCard({ reading }: { reading: ZiweiReading }) {
+  if (reading.status === "unavailable") {
+    return <section className="system-chart system-chart--unavailable"><p className="eyebrow">ZI WEI DOU SHU · 紫微斗数</p><h2>出生时间未知，十二宫不推算</h2><p>{reading.caveats[0]}</p></section>;
+  }
+  return (
+    <section className="system-chart ziwei-chart">
+      <header className="system-chart__header"><div><p className="eyebrow">ZI WEI DOU SHU · 紫微斗数</p><h2>十二宫星盘</h2><p>宫位、主星与四化来自本地确定性排盘。点击或放大页面可阅读全部细节。</p></div><span className="calculation-label">已排盘 · v{reading.engine.version}</span></header>
+      <div className="ziwei-board" role="img" aria-label={`紫微十二宫，命宫在${reading.soulPalaceBranch}，身宫在${reading.bodyPalaceBranch}`}>
+        {reading.palaces.map((palace, index) => <article key={palace.id} style={{ gridArea: ziweiGridAreas[index] }} className={palace.name === "命宫" ? "is-soul" : palace.isBodyPalace ? "is-body" : ""}><header><b>{palace.name}</b><span>{palace.heavenlyStem}{palace.earthlyBranch}</span></header><p>{palace.majorStars.map((star) => <span key={star.name}>{star.name}{star.transformation ? <i>化{star.transformation}</i> : null}</span>)}</p>{!palace.majorStars.length && <small>无十四主星</small>}{palace.isBodyPalace && <em>身宫</em>}</article>)}
+        <div className="ziwei-board__center"><small>命宫 · {reading.soulPalaceBranch}</small><strong>{reading.soulStar}</strong><span>{reading.fiveElementsClass}</span><p>身主 {reading.bodyStar} · 身宫 {reading.bodyPalaceBranch}</p></div>
+      </div>
+      <details className="calculation-details"><summary>查看紫微计算规则与限制</summary><dl><div><dt>引擎</dt><dd>{reading.engine.id} {reading.engine.version}</dd></div><div><dt>流派配置</dt><dd>{reading.engine.school}</dd></div><div><dt>闰月</dt><dd>前后半月调整开启</dd></div><div><dt>大限方向</dt><dd>{reading.conventions.directionRule === "traditional-gender" ? "使用所选传统输入" : "未应用"}</dd></div></dl>{reading.caveats.map((caveat) => <p key={caveat}>{caveat}</p>)}</details>
+    </section>
+  );
+}
+
+const westernGlyphs: Record<string, string> = { Sun: "☉", Moon: "☽", Mercury: "☿", Venus: "♀", Mars: "♂", Jupiter: "♃", Saturn: "♄", Uranus: "♅", Neptune: "♆", Pluto: "♇" };
+const westernSigns = ["♈", "♉", "♊", "♋", "♌", "♍", "♎", "♏", "♐", "♑", "♒", "♓"];
+
+function wheelPoint(longitude: number, radius: number) {
+  const angle = (longitude - 90) * Math.PI / 180;
+  return { x: 160 + Math.cos(angle) * radius, y: 160 + Math.sin(angle) * radius };
+}
+
+function WesternChartCard({ reading }: { reading: WesternReading }) {
+  const placements = reading.placements.slice(0, 10);
+  const placementByBody = new Map(placements.map((placement) => [placement.body, placement]));
+  return (
+    <section className="system-chart western-chart">
+      <header className="system-chart__header"><div><p className="eyebrow">WESTERN NATAL · 西方占星</p><h2>本命星盘</h2><p>行星黄经、相位与{reading.completeness === "timed-chart" ? "整宫制宫位" : "当日星座位置"}来自本地天文计算。</p></div><span className="calculation-label">已计算 · v{reading.engine.version}</span></header>
+      <div className="western-chart__layout">
+        <svg className="western-wheel" viewBox="0 0 320 320" role="img" aria-label={`西方本命星盘，共 ${placements.length} 个行星位置`}>
+          <circle cx="160" cy="160" r="148" /><circle cx="160" cy="160" r="114" /><circle cx="160" cy="160" r="76" />
+          {Array.from({ length: 12 }, (_, index) => { const inner = wheelPoint(index * 30, 114); const outer = wheelPoint(index * 30, 148); const label = wheelPoint(index * 30 + 15, 132); return <g key={westernSigns[index]}><line x1={inner.x} y1={inner.y} x2={outer.x} y2={outer.y} /><text x={label.x} y={label.y}>{westernSigns[index]}</text></g>; })}
+          {reading.aspects.slice(0, 10).map((aspect) => { const first = placementByBody.get(aspect.bodyA); const second = placementByBody.get(aspect.bodyB); if (!first || !second) return null; const a = wheelPoint(first.longitude, 72); const b = wheelPoint(second.longitude, 72); return <line key={aspect.id} className={`aspect-line aspect-line--${aspect.type}`} x1={a.x} y1={a.y} x2={b.x} y2={b.y} />; })}
+          {placements.map((placement) => { const point = wheelPoint(placement.longitude, 94); return <g key={placement.id} className="planet-node"><circle cx={point.x} cy={point.y} r="12" /><text x={point.x} y={point.y + 1}>{westernGlyphs[placement.body] ?? placement.body.slice(0, 1)}</text></g>; })}
+          <text className="western-wheel__center" x="160" y="155">{reading.angles.ascendant ? `ASC ${reading.angles.ascendant.sign}` : "TIME UNKNOWN"}</text><text className="western-wheel__sub" x="160" y="174">TROPICAL · WHOLE SIGN</text>
+        </svg>
+        <div className="western-placements">{placements.map((placement) => <div key={placement.id}><span>{westernGlyphs[placement.body] ?? "•"}</span><b>{placement.body}</b><p>{placement.sign} {placement.degree}°{String(placement.minute).padStart(2, "0")}′{placement.house ? ` · H${placement.house}` : ""}</p>{placement.retrograde && <small>R</small>}</div>)}</div>
+      </div>
+      <details className="calculation-details"><summary>查看西占计算规则与限制</summary><dl><div><dt>黄道</dt><dd>热带黄道</dd></div><div><dt>宫制</dt><dd>整宫制</dd></div><div><dt>时区</dt><dd>IANA 历史偏移 · UTC {reading.utcOffsetHours >= 0 ? "+" : ""}{reading.utcOffsetHours}</dd></div><div><dt>出生时刻</dt><dd>{reading.utcIso}</dd></div></dl>{reading.caveats.map((caveat) => <p key={caveat}>{caveat}</p>)}</details>
+    </section>
   );
 }
 
@@ -277,10 +344,10 @@ function ProductVisual({ product, compact = false }: { product: Product; compact
 
 function ErrorState({ route, title, message, href, action }: { route: RouteName; title: string; message: string; href: string; action: string }) {
   return (
-    <PageShell route={route} title="未找到" eyebrow="DEMO ERROR" backHref={href}>
+    <PageShell route={route} title="未找到" eyebrow="ROUTE ERROR" backHref={href}>
       <div className="page state-page">
         <div className="state-mark" aria-hidden="true">?</div>
-        <p className="eyebrow">THIS DEMO PATH IS MISSING</p>
+        <p className="eyebrow">THIS PATH IS MISSING</p>
         <h1>{title}</h1>
         <p>{message}</p>
         <Link href={href} className="button button--primary">{action} <span aria-hidden="true">→</span></Link>
@@ -317,11 +384,11 @@ function LandingPage() {
 
 const onboardingSteps = [
   { id: "name", number: "01", title: "怎么称呼你？", helper: "我们会用这个名字，让体验更自然。" },
-  { id: "date", number: "02", title: "你的出生日期", helper: "日期会进入真实八字四柱计算。" },
-  { id: "time", number: "03", title: "你的出生时间", helper: "当地时间用于确定时柱；不知道时可以生成暂缺时柱的结果。" },
+  { id: "date", number: "02", title: "你的出生日期", helper: "日期会进入八字、紫微与西方本命盘计算。" },
+  { id: "time", number: "03", title: "你的出生时间", helper: "当地时间用于四柱、紫微十二宫、西占上升与宫位；不知道时会明确降级。" },
   { id: "location", number: "04", title: "你出生在哪里？", helper: "搜索城市与国家，再从真实地点结果中确认出生地。" },
-  { id: "rules", number: "05", title: "传统规则输入", helper: "本轮先记录此项；后续运势与紫微引擎才会使用。" },
-  { id: "review", number: "06", title: "确认计算范围", helper: "八字将真实计算；紫微、西占和综合解释仍使用演示内容。" },
+  { id: "rules", number: "05", title: "传统规则输入", helper: "紫微大限顺逆会使用传统男／女输入；若不选择，将省略该层，不推测身份。" },
+  { id: "review", number: "06", title: "确认计算范围", helper: "三个命盘体系、当前时运与规则综合都会在浏览器内计算。" },
 ];
 
 const defaultOnboardingDraft: OnboardingDraft = {
@@ -423,7 +490,8 @@ function OnboardingPage() {
           birthPlace: form.selectedPlace,
           traditionalGender: form.gender,
         };
-        calculateBazi(profile);
+        const bazi = calculateBazi(profile);
+        buildCalculatedExperience(bazi, localDateString());
         writeBirthProfile(profile);
         sessionStorage.setItem("life-map-complete", "true");
         navigate("/generating");
@@ -448,13 +516,13 @@ function OnboardingPage() {
             {current.id === "date" && <label className="field"><span>出生日期</span><input type="date" min="1900-01-01" max="2100-12-31" value={form.date} onChange={(event) => setForm({ ...form, date: event.target.value })} /><small>当前引擎支持 1900—2100 年的公历输入。</small></label>}
             {current.id === "time" && <>
               <label className="field"><span>当地时间</span><input type="time" value={form.time} disabled={form.unknownTime} onChange={(event) => setForm({ ...form, time: event.target.value })} /></label>
-              <label className="check-field"><input type="checkbox" checked={form.unknownTime} onChange={(event) => setForm({ ...form, unknownTime: event.target.checked })} /><span><strong>我不知道准确时间</strong><small>本阶段会省略八字时柱；未来紫微宫位与西占上升也会标记为不确定。</small></span></label>
+              <label className="check-field"><input type="checkbox" checked={form.unknownTime} onChange={(event) => setForm({ ...form, unknownTime: event.target.checked })} /><span><strong>我不知道准确时间</strong><small>会省略八字时柱与紫微十二宫；西占只显示当日行星星座，不推算上升与宫位。</small></span></label>
             </>}
             {current.id === "location" && <BirthplaceSearch query={form.locationQuery} selectedPlace={form.selectedPlace} onQueryChange={(locationQuery) => setForm((value) => ({ ...value, locationQuery }))} onSelect={(selectedPlace) => setForm((value) => ({ ...value, selectedPlace }))} />}
             {current.id === "rules" && <fieldset className="choice-field"><legend>传统规则输入（选填）</legend>{[["female", "女性"], ["male", "男性"], ["nonbinary", "非二元"], ["prefer-not-to-say", "不愿说明"]].map(([value, label]) => <label key={value}><input type="radio" name="gender" value={value} checked={form.gender === value} onChange={(event) => setForm({ ...form, gender: event.target.value as OnboardingDraft["gender"] })} /><span>{label}</span></label>)}</fieldset>}
             {current.id === "review" && <div className="review-card">
               <dl><div><dt>称呼</dt><dd>{form.name}</dd></div><div><dt>出生日期</dt><dd>{form.date}</dd></div><div><dt>出生时间</dt><dd>{form.unknownTime ? "未知（不计算时柱）" : form.time}</dd></div><div><dt>出生地点</dt><dd>{form.selectedPlace?.label ?? "尚未选择"}</dd></div><div><dt>时区</dt><dd>{form.selectedPlace?.timeZone ?? "—"}</dd></div></dl>
-              <label className="check-field"><input type="checkbox" checked={form.consent} onChange={(event) => setForm({ ...form, consent: event.target.checked })} /><span><strong>我理解当前的计算范围</strong><small>八字四柱会真实计算；紫微、西占、时运与综合解释仍是固定演示，不代表我的个人结果。</small></span></label>
+              <label className="check-field"><input type="checkbox" checked={form.consent} onChange={(event) => setForm({ ...form, consent: event.target.checked })} /><span><strong>我理解当前的计算范围</strong><small>命盘与时运事实由版本化引擎计算；综合文字来自规则模板，不是实时 AI、科学预测或结果保证。</small></span></label>
             </div>}
           </div>
           {error && <p className="inline-notice" role="alert">{error}</p>}
@@ -466,10 +534,10 @@ function OnboardingPage() {
   );
 }
 
-const generationStages = ["正在验证出生资料", "正在按节气排列年柱与月柱", "正在计算日柱与时柱", "正在记录计算约定", "正在载入演示综合解读"];
+const generationStages = ["正在验证出生资料与历史时区", "正在按节气排列四柱", "正在展开紫微十二宫", "正在定位出生时的行星与宫位", "正在连接可追溯的综合证据"];
 
 function GeneratingPage() {
-  const reading = useActiveBaziReading();
+  const { reading, experience, calculationError } = useActiveExperience();
   const [active, setActive] = useState(0);
   const [done, setDone] = useState(false);
   useEffect(() => {
@@ -480,19 +548,20 @@ function GeneratingPage() {
     }), reduced ? 180 : 620);
     return () => window.clearInterval(interval);
   }, []);
+  if (!experience) return <ErrorState route="generating" title="这组资料暂时无法完整排盘" message={calculationError ?? "请返回检查出生日期、时间和地点。"} href="/onboarding" action="返回检查资料" />;
   return (
     <PageShell route="generating">
       <div className="generation" aria-live="polite">
         <div className="generation__art" aria-hidden="true"><span className="generation-orbit" /><span className="generation-grid" /><BrandMark large /></div>
         <p className="eyebrow">CALIBRATING YOUR MAP</p>
-        <h1>{done ? "你的八字结构已生成" : generationStages[active]}</h1>
-        <p>{done ? "四柱来自确定性计算；其他体系与综合解释会继续以演示状态清楚标注。" : "我们正在先建立可复算的命盘事实，再把解释与事实分开呈现。"}</p>
+        <h1>{done ? "你的人生地图已生成" : generationStages[active]}</h1>
+        <p>{done ? "八字、紫微、西占与当前时运已经完成本地计算；解释层仍与计算事实清楚分开。" : "每个体系先生成可复算事实，再由规则层寻找共识与张力。"}</p>
         <ol className="generation__stages">
           {generationStages.map((stage, index) => <li key={stage} className={index < active || done ? "is-complete" : index === active ? "is-active" : ""}><span>{index < active || done ? "✓" : String(index + 1).padStart(2, "0")}</span>{stage}</li>)}
         </ol>
-        {done && <div className="generation__result" aria-label="四柱计算结果">{[reading.pillars.year, reading.pillars.month, reading.pillars.day, reading.pillars.time].map((pillar, index) => <span key={pillar?.kind ?? index}><small>{pillar?.label ?? "时柱"}</small><b>{pillar?.ganZhi ?? "未知"}</b></span>)}</div>}
-        {done ? <button className="button button--primary" onClick={() => navigate("/today")}>进入今日地图 <span aria-hidden="true">→</span></button> : <button className="text-button" onClick={() => { setActive(generationStages.length - 1); setDone(true); }}>跳过演示动画</button>}
-        <small className="calculation-label">八字已排盘 · 其余体系为体验内容</small>
+        {done && <div className="generation__result" aria-label="命盘计算结果"><span><small>八字</small><b>{reading.pillars.day.ganZhi}日</b></span><span><small>紫微</small><b>{experience.ziwei.status === "calculated" ? `${experience.ziwei.soulPalaceBranch}宫` : "时间未知"}</b></span><span><small>太阳</small><b>{experience.western.placements.find((item) => item.body === "Sun")?.sign ?? "—"}</b></span><span><small>综合</small><b>{experience.todayInsight.title}</b></span></div>}
+        {done ? <button className="button button--primary" onClick={() => navigate("/today")}>进入今日地图 <span aria-hidden="true">→</span></button> : <button className="text-button" onClick={() => { setActive(generationStages.length - 1); setDone(true); }}>跳过等待动画</button>}
+        <small className="calculation-label">三体系已计算 · 规则综合 v{experience.engine.version}</small>
       </div>
     </PageShell>
   );
@@ -501,12 +570,12 @@ function GeneratingPage() {
 function ReportOffer({ compact = false }: { compact?: boolean }) {
   return (
     <section className={`report-offer ${compact ? "report-offer--compact" : ""}`}>
-      <div className="report-offer__folio" aria-hidden="true"><span>08</span><i /><i /><i /></div>
+      <div className="report-offer__folio" aria-hidden="true"><span>10</span><i /><i /><i /></div>
       <div>
         <p className="eyebrow">PRIVATE PDF · 完整报告</p>
-        <h2>把你的四柱事实与反思练习，整理成一份私人报告</h2>
-        <p>八页双语式阅读体验：计算说明、四柱结构、表层五行、传统反思角度与七日练习。出生资料只留在浏览器。</p>
-        <div className="report-offer__meta"><span>8 pages</span><span>本地生成</span><strong>USD $2</strong></div>
+        <h2>把四套计算事实与综合洞察，整理成一份私人报告</h2>
+        <p>十页阅读体验：八字、紫微、西占、当前时运、可追溯综合洞察与七日练习。出生资料只留在浏览器。</p>
+        <div className="report-offer__meta"><span>10 pages</span><span>本地生成</span><strong>USD $2</strong></div>
         <Link href="/report" className="button button--primary">预览并购买完整报告 <span aria-hidden="true">→</span></Link>
       </div>
     </section>
@@ -514,14 +583,16 @@ function ReportOffer({ compact = false }: { compact?: boolean }) {
 }
 
 function TodayPage() {
-  const reading = useActiveBaziReading();
-  const today = insights[0];
+  const { reading, experience, calculationError } = useActiveExperience();
+  if (!experience) return <ErrorState route="today" title="今天的地图无法完成计算" message={calculationError ?? "请检查出生资料。"} href="/onboarding" action="检查出生资料" />;
+  const today = experience.todayInsight;
   const featured = products[0];
+  const timing = experience.timing;
   return (
     <PageShell route="today">
       <div className="page today-page">
         <header className="today-greeting"><div><span>YOUR INNER WEATHER · 此刻的内在天气</span><h1>你好，{reading.profile.displayName}</h1></div><div className="day-seal" aria-label={`日主 ${reading.dayMaster.stem}，${reading.dayMaster.element}`}><span>{reading.dayMaster.stem}</span><small>{elementEnglish[reading.dayMaster.element]}</small></div></header>
-        <PhaseScopeNotice />
+        <PhaseScopeNotice experience={experience} />
         <section className="today-hero">
           <div className="today-hero__motif" aria-hidden="true"><i /><i /><i /></div>
           <p className="eyebrow">{today.eyebrow} · TODAY&apos;S THEME</p>
@@ -539,16 +610,16 @@ function TodayPage() {
             <Link href="/iching" className="quick-card quick-card--cinnabar"><span className="quick-card__motif quick-card__motif--iching" aria-hidden="true" /><small>I CHING</small><h3>问一卦</h3><p>为此刻的具体问题留出空间</p><b aria-hidden="true">→</b></Link>
           </div>
         </section>
-        <section className="section-block"><SectionHeader eyebrow="YOUR PATTERNS" title="生命领域" action="查看全部" href="/life-map" /><div className="domain-grid domain-grid--today">{domains.slice(0, 4).map((domain, index) => <Link href={`/life-map/${domain.id}`} className="domain-card" key={domain.id}><span className="domain-card__index">0{index + 1}</span><small>{domain.nameEn}</small><h3>{domain.nameZh}</h3><p>{domain.pattern}</p><span className={`state state--${domain.state}`}>{domain.state === "active" ? "当前活跃" : domain.state === "steady" ? "稳定主题" : "值得反思"}</span></Link>)}</div></section>
+        <section className="section-block"><SectionHeader eyebrow="YOUR PATTERNS" title="生命领域" action="查看全部" href="/life-map" /><div className="domain-grid domain-grid--today">{experience.domains.slice(0, 4).map((domain, index) => <Link href={`/life-map/${domain.id}`} className="domain-card" key={domain.id}><span className="domain-card__index">0{index + 1}</span><small>{domain.nameEn}</small><h3>{domain.nameZh}</h3><p>{domain.pattern}</p><span className={`state state--${domain.state}`}>{domain.state === "active" ? "多源交集" : domain.state === "steady" ? "独立线索" : "保留张力"}</span></Link>)}</div></section>
         <section className="timing-card">
           <div><p className="eyebrow">CURRENT SEASON · 当前阶段</p><h2>{timing.title}</h2><p>{timing.summary}</p><Link href="/timing" className="text-link">展开时间线 <span aria-hidden="true">→</span></Link></div>
           <div className="mini-timeline" aria-label={`当前阶段从 ${timing.start} 至 ${timing.end}`}><span>{timing.start}</span><div style={{ "--timeline-position": `${timing.nowPosition * 100}%` } as React.CSSProperties}><i style={{ left: `${timing.nowPosition * 100}%` }}><b>现在</b></i></div><span>{timing.end}</span></div>
         </section>
         <section className="symbol-section">
           <ElementPresenceGraph reading={reading} compact />
-          <div><p className="eyebrow">TODAY&apos;S ELEMENT · 演示解释</p><h2>成长 · 扩张 · 柔韧</h2><p>左侧图表来自你的确定性四柱；这段“木”主题仍是固定演示解释，不代表由数量直接推导出的结论。</p><div className="practice"><span>今日练习</span><p>写下未来七天唯一愿意持续培育的小行动。</p></div></div>
+          <div><p className="eyebrow">RULE-BASED REFLECTION · 规则综合</p><h2>{today.title}</h2><p>左侧是确定性四柱结构；综合主题只引用上方可展开的计算证据，不从五行数量直接推导吉凶。</p><div className="practice"><span>今日练习</span><p>{today.reflectionPrompt}</p></div></div>
         </section>
-        <section className="section-block"><SectionHeader eyebrow="OPTIONAL OBJECT" title="与你的成长主题呼应" /><article className="recommendation-card"><ProductVisual product={featured} /><div className="recommendation-card__content"><div><span className="pill">WOOD · 新开始</span><h2>{featured.nameEn}</h2><h3>{featured.nameZh}</h3><p>{recommendation.summary}</p></div><div className="recommendation-card__footer"><span>{featured.price}</span><Link href={`/objects/${featured.slug}`} className="button button--secondary">为什么推荐给我？</Link></div></div></article></section>
+        <section className="section-block"><SectionHeader eyebrow="OPTIONAL OBJECT" title={`与「${today.title}」主题并置`} /><article className="recommendation-card"><ProductVisual product={featured} /><div className="recommendation-card__content"><div><span className="pill">SYMBOLIC · OPTIONAL</span><h2>{featured.nameEn}</h2><h3>{featured.nameZh}</h3><p>这件物品只作为当前反思主题的可选提醒；它不改变命盘、时运或现实结果。先完成上面的无购买练习，再决定是否需要任何物件。</p></div><div className="recommendation-card__footer"><span>{featured.price}</span><Link href={`/objects/${featured.slug}`} className="button button--secondary">查看象征含义</Link></div></div></article></section>
         <section className="recent-questions"><SectionHeader eyebrow="RECENT" title="最近想过的问题" /><Link href="/ask?prompt=我现在适合换工作吗？">我现在适合换工作吗？ <span>→</span></Link><Link href="/ask?prompt=为什么我做一段时间后就想开始新的事情？">为什么我做一段时间后就想开始新的事情？ <span>→</span></Link></section>
       </div>
     </PageShell>
@@ -556,52 +627,55 @@ function TodayPage() {
 }
 
 function InsightPage({ id }: { id?: string }) {
-  const insight = insights.find((item) => item.id === (id ?? insights[0].id));
-  if (!insight) return <ErrorState route="insight" title="没有找到这个洞察" message="这个演示洞察可能已被移动，或链接并不存在。你的固定演示数据没有受到影响。" href="/today" action="回到今日" />;
+  const { experience, calculationError } = useActiveExperience();
+  if (!experience) return <ErrorState route="insight" title="洞察证据无法完成计算" message={calculationError ?? "请检查出生资料。"} href="/onboarding" action="检查出生资料" />;
+  const insight = id === experience.todayInsight.id || !id ? experience.todayInsight : Object.values(experience.domainInsights).find((item) => item.id === id);
+  if (!insight) return <ErrorState route="insight" title="没有找到这个洞察" message="这个计算洞察链接不存在，或已经由新版规则替换。" href="/today" action="回到今日" />;
   return (
     <PageShell route="insight" title="为什么？" eyebrow="INSIGHT EVIDENCE" backHref="/today">
       <div className="page reading-page">
         <header className="reading-hero"><p className="eyebrow">{insight.eyebrow} · {insight.kind === "consensus" ? "MULTI-SYSTEM CONSENSUS" : "TENSION"}</p><h1>{insight.title}</h1><h2>{insight.subtitle}</h2><p>{insight.summary}</p><div className="evidence-chips">{insight.evidence.map((item) => <EvidenceChip key={item.factId} system={item.system} role={item.role} />)}</div></header>
         <section className="reading-section"><span className="section-number">01</span><SectionHeader title="综合解释" eyebrow="SYNTHESIS" /><p className="reading-copy">{insight.kind === "consensus" ? "这一主题在两个以上体系中出现，但每个体系提供了不同角度。共同点不是结果预测，而是此刻值得观察的方向。" : "不同体系在这里保留了有意义的张力；我们不会把它们平均成一个分数。"}</p></section>
-        <section className="reading-section"><span className="section-number">02</span><SectionHeader title="依据来自哪里" eyebrow="EVIDENCE" /><EvidenceList evidence={insight.evidence} /></section>
+        <section className="reading-section"><span className="section-number">02</span><SectionHeader title="依据来自哪里" eyebrow="EVIDENCE" /><EvidenceList evidence={insight.evidence} experience={experience} /></section>
         {insight.tensionNote && <section className="tension-card"><p className="eyebrow">TENSION · 张力</p><h2>不需要急着消除的矛盾</h2><p>{insight.tensionNote}</p></section>}
         <section className="reflection-card"><span aria-hidden="true">问</span><div><p className="eyebrow">REFLECTION PROMPT</p><h2>{insight.reflectionPrompt}</h2><Link href={`/ask?prompt=${encodeURIComponent(insight.reflectionPrompt)}`} className="button button--primary">和命盘继续聊 <span>→</span></Link></div></section>
-        <p className="disclosure disclosure--center">所有内容基于虚构演示数据，用于反思，不是科学预测。</p>
+        <p className="disclosure disclosure--center">命盘事实来自版本化本地引擎；综合文字来自规则模板，用于反思，不是实时 AI 或科学预测。</p>
       </div>
     </PageShell>
   );
 }
 
 function LifeMapPage() {
-  const reading = useActiveBaziReading();
+  const { reading, experience, calculationError } = useActiveExperience();
+  if (!experience) return <ErrorState route="life-map" title="命盘无法完成计算" message={calculationError ?? "请检查出生资料。"} href="/onboarding" action="检查出生资料" />;
+  const identity = experience.domainInsights.identity;
   return (
     <PageShell route="life-map">
       <div className="page life-map-page">
-        <PhaseScopeNotice />
-        <header className="map-hero"><div><p className="eyebrow">YOUR NATAL BLUEPRINT · 你的底图</p><h1>Builder<br /><i>×</i> Explorer</h1><p>你倾向于把模糊的想法变成可以运作的结构，同时需要持续发现新的可能。真正让你投入的，往往不是稳定本身，而是有空间参与定义方向。</p><div className="evidence-chips"><EvidenceChip system="bazi" role="primary" /><EvidenceChip system="ziwei" role="primary" /><EvidenceChip system="astrology" role="supporting" /></div></div><div className="map-diagram" aria-label="三个传统体系汇聚为 Life Map 的抽象图"><span className="map-ring" /><span className="map-grid" /><span className="map-pillars" /><b>命</b></div></header>
+        <PhaseScopeNotice experience={experience} />
+        <header className="map-hero"><div><p className="eyebrow">YOUR NATAL BLUEPRINT · 你的底图</p><h1>{identity.title.split(" · ")[0]}<br /><i>×</i> {identity.title.split(" · ")[1] ?? "观察"}</h1><p>{identity.summary}</p><div className="evidence-chips">{identity.evidence.map((item) => <EvidenceChip key={item.factId} system={item.system} role={item.role} />)}</div></div><div className="map-diagram" aria-label="三个计算体系汇聚为 Life Map 的抽象图"><span className="map-ring" /><span className="map-grid" /><span className="map-pillars" /><b>命</b></div></header>
         <div className="map-note"><span>如何阅读</span><p>这些领域不是命运评分，而是理解长期模式的入口。当前活跃表示本期内容的主题强调，不代表好或坏。</p></div>
         <BaziChartCard reading={reading} id="bazi-chart" visual />
-        <section className="section-block"><SectionHeader eyebrow="EIGHT DOMAINS" title="八个生命领域" /><div className="domain-grid domain-grid--all">{domains.map((domain, index) => <Link href={`/life-map/${domain.id}`} className="domain-card domain-card--wide" key={domain.id}><span className="domain-card__index">{String(index + 1).padStart(2, "0")}</span><div><small>{domain.nameEn}</small><h3>{domain.nameZh}</h3></div><p>{domain.pattern}</p><span className={`state state--${domain.state}`}>{domain.state === "active" ? "当前活跃" : domain.state === "steady" ? "稳定主题" : domain.state === "emerging" ? "正在浮现" : "值得反思"}</span><b aria-hidden="true">↗</b></Link>)}</div></section>
+        <ZiweiChartCard reading={experience.ziwei} />
+        <WesternChartCard reading={experience.western} />
+        <section className="section-block"><SectionHeader eyebrow="EIGHT DOMAINS" title="八个生命领域" /><div className="domain-grid domain-grid--all">{experience.domains.map((domain, index) => <Link href={`/life-map/${domain.id}`} className="domain-card domain-card--wide" key={domain.id}><span className="domain-card__index">{String(index + 1).padStart(2, "0")}</span><div><small>{domain.nameEn}</small><h3>{domain.nameZh}</h3></div><p>{domain.pattern}</p><span className={`state state--${domain.state}`}>{domain.state === "active" ? "多源交集" : domain.state === "steady" ? "独立线索" : "保留张力"}</span><b aria-hidden="true">↗</b></Link>)}</div></section>
       </div>
     </PageShell>
   );
 }
 
 function DomainPage({ id }: { id?: string }) {
-  const domain = domains.find((item) => item.id === (id ?? "career"));
-  if (!domain) return <ErrorState route="domain" title="没有找到这个生命领域" message="这个演示领域不存在。你可以回到 Life Map 查看八个可用领域。" href="/life-map" action="查看 Life Map" />;
-  const insight = getInsight(domain.insightId);
-  const dimensions = domain.dimensions ?? [
-    { label: "内在驱动", qualitativeValue: "high" as const, internalValue: 0.78 },
-    { label: "关系感受", qualitativeValue: "medium" as const, internalValue: 0.56 },
-    { label: "当前强调", qualitativeValue: "high" as const, internalValue: 0.72 },
-  ];
+  const { experience, calculationError } = useActiveExperience();
+  if (!experience) return <ErrorState route="domain" title="生命领域无法完成计算" message={calculationError ?? "请检查出生资料。"} href="/onboarding" action="检查出生资料" />;
+  const domain = experience.domains.find((item) => item.id === (id ?? "career"));
+  if (!domain) return <ErrorState route="domain" title="没有找到这个生命领域" message="这个领域不存在。你可以回到 Life Map 查看八个可用领域。" href="/life-map" action="查看 Life Map" />;
+  const insight = experience.domainInsights[domain.id];
   return (
     <PageShell route="domain" title={`${domain.nameZh} / ${domain.nameEn}`} eyebrow="LIFE DOMAIN" backHref="/life-map">
       <div className="page domain-page">
         <header className="domain-hero"><p className="eyebrow">{domain.nameEn.toUpperCase()} PATTERN</p><h1>{domain.pattern}</h1><h2>{insight.subtitle}</h2><p>{insight.summary}</p></header>
-        <section className="dimensions-card"><div><p className="eyebrow">QUALITATIVE DIMENSIONS</p><h2>你的模式侧重</h2><p>以下为解释性标签，不是科学测量或命运评分。</p></div><div className="dimension-list">{dimensions.map((dimension) => <div key={dimension.label}><span><b>{dimension.label}</b><small>{dimension.qualitativeValue === "very-high" ? "很突出" : dimension.qualitativeValue === "high" ? "较突出" : "适中"}</small></span><i><b style={{ width: `${dimension.internalValue * 100}%` }} /></i></div>)}</div></section>
-        <section className="reading-section"><SectionHeader eyebrow="MULTI-SYSTEM READING" title="三个体系如何描述它" /><p className="reading-copy">这不是把三个传统相加成一个结论，而是让每条线索保留自己的来源与语言，再观察它们在哪里相遇。</p><EvidenceList evidence={insight.evidence} /></section>
+        <section className="calculation-coverage"><div><p className="eyebrow">CALCULATION COVERAGE</p><h2>本领域用了哪些真实事实</h2><p>数量只表示证据来源覆盖，不是置信度或命运评分。</p></div>{(["bazi", "ziwei", "astrology"] as SystemId[]).map((system) => <article key={system}><span className={`system-seal system-seal--${system}`}>{systemLabels[system].short.slice(0, 1)}</span><div><b>{systemLabels[system].full}</b><small>{insight.evidence.some((item) => item.system === system) ? "已连接计算事实" : "此领域没有可用事实"}</small></div></article>)}</section>
+        <section className="reading-section"><SectionHeader eyebrow="MULTI-SYSTEM READING" title="三个体系如何描述它" /><p className="reading-copy">这不是把三个传统相加成一个结论，而是让每条线索保留自己的来源与语言，再观察它们在哪里相遇。</p><EvidenceList evidence={insight.evidence} experience={experience} /></section>
         {insight.tensionNote && <section className="tension-card"><p className="eyebrow">A USEFUL TENSION</p><h2>值得保留的张力</h2><p>{insight.tensionNote}</p></section>}
         <section className="reflection-card"><span aria-hidden="true">问</span><div><p className="eyebrow">TAKE THIS WITH YOU</p><h2>{insight.reflectionPrompt}</h2><Link href={`/ask?prompt=${encodeURIComponent(insight.reflectionPrompt)}`} className="button button--primary">问一个{domain.nameZh}问题 <span>→</span></Link></div></section>
       </div>
@@ -610,31 +684,34 @@ function DomainPage({ id }: { id?: string }) {
 }
 
 function AskPage() {
+  const { experience, calculationError } = useActiveExperience();
   const [input, setInput] = useState("");
   const [answer, setAnswer] = useState<AskResponse | null>(null);
   useEffect(() => {
+    if (!experience) return;
     const prompt = new URLSearchParams(window.location.search).get("prompt");
-    if (prompt) queueMicrotask(() => { setInput(prompt); setAnswer(routeAsk(prompt)); });
-  }, []);
-  const submit = (event: FormEvent) => { event.preventDefault(); if (input.trim()) setAnswer(routeAsk(input)); };
+    if (prompt) queueMicrotask(() => { setInput(prompt); setAnswer(routeCalculatedAsk(prompt, experience)); });
+  }, [experience]);
+  if (!experience) return <ErrorState route="ask" title="问命盘需要先完成计算" message={calculationError ?? "请检查出生资料。"} href="/onboarding" action="检查出生资料" />;
+  const submit = (event: FormEvent) => { event.preventDefault(); if (input.trim()) setAnswer(routeCalculatedAsk(input, experience)); };
   return (
     <PageShell route="ask">
       <div className={`page ask-page ${answer ? "ask-page--answered" : ""}`}>
         {!answer ? <>
-          <header className="ask-hero"><div className="ask-orbit" aria-hidden="true"><span>问</span></div><p className="eyebrow">ASK MY CHART · 问命盘</p><h1>你最近在想什么？</h1><p>我会从固定的演示命盘事实中寻找共识、张力和不同角度，并让每个回答都能展开查看依据。</p><span className="fixture-label">DEMO · 不会调用实时 AI</span></header>
-          <section className="suggestions"><p className="eyebrow">SUGGESTED QUESTIONS</p>{askResponses.slice(0, 4).map((response, index) => <button key={response.id} onClick={() => { setInput(response.suggestedPrompt); setAnswer(response); }}><span>0{index + 1}</span>{response.suggestedPrompt}<b>→</b></button>)}</section>
-        </> : <AskAnswer answer={answer} question={input} onReset={() => { setAnswer(null); setInput(""); }} />}
-        <form className="chat-composer" onSubmit={submit}><label htmlFor="chart-question" className="sr-only">输入你想问命盘的问题</label><textarea id="chart-question" value={input} onChange={(event) => setInput(event.target.value)} placeholder="写下一个具体的问题…" rows={1} /><button type="submit" aria-label="发送问题" disabled={!input.trim()}>↑</button><small>固定演示回答 · 不替代专业建议</small></form>
+          <header className="ask-hero"><div className="ask-orbit" aria-hidden="true"><span>问</span></div><p className="eyebrow">ASK MY CHART · 问命盘</p><h1>你最近在想什么？</h1><p>我会从你的真实计算事实中寻找共识、张力和不同角度，并让每个回答都能展开查看依据。</p><span className="fixture-label">CALCULATED · 规则综合，不调用实时 AI</span></header>
+          <section className="suggestions"><p className="eyebrow">SUGGESTED QUESTIONS</p>{askResponses.slice(0, 4).map((response, index) => <button key={response.id} onClick={() => { setInput(response.suggestedPrompt); setAnswer(routeCalculatedAsk(response.suggestedPrompt, experience)); }}><span>0{index + 1}</span>{response.suggestedPrompt}<b>→</b></button>)}</section>
+        </> : <AskAnswer answer={answer} question={input} experience={experience} onReset={() => { setAnswer(null); setInput(""); }} />}
+        <form className="chat-composer" onSubmit={submit}><label htmlFor="chart-question" className="sr-only">输入你想问命盘的问题</label><textarea id="chart-question" value={input} onChange={(event) => setInput(event.target.value)} placeholder="写下一个具体的问题…" rows={1} /><button type="submit" aria-label="发送问题" disabled={!input.trim()}>↑</button><small>基于已计算事实的规则回答 · 不替代专业建议</small></form>
       </div>
     </PageShell>
   );
 }
 
-function AskAnswer({ answer, question, onReset }: { answer: AskResponse; question: string; onReset: () => void }) {
+function AskAnswer({ answer, question, experience, onReset }: { answer: AskResponse; question: string; experience: CalculatedExperience; onReset: () => void }) {
   return (
     <article className="answer">
       <header><button className="text-button" onClick={onReset}>← 新问题</button><p className="eyebrow">YOUR QUESTION</p><blockquote>{question}</blockquote><span className="kind-label">{answer.kind === "consensus" ? "多体系共识" : answer.kind === "tension" ? "有意义的张力" : "独立线索"}</span><h1>{answer.title}</h1><p>{answer.directAnswer}</p></header>
-      {answer.sections.map((section, index) => <section className="answer-section" key={section.heading}><span>0{index + 1}</span><div><h2>{section.heading}</h2><p>{section.body}</p><EvidenceList evidence={section.evidence} /></div></section>)}
+      {answer.sections.map((section, index) => <section className="answer-section" key={section.heading}><span>0{index + 1}</span><div><h2>{section.heading}</h2><p>{section.body}</p><EvidenceList evidence={section.evidence} experience={experience} /></div></section>)}
       <section className="answer-reflection"><p className="eyebrow">A QUESTION TO KEEP</p><h2>{answer.reflectionQuestion}</h2></section>
       {answer.relatedDomain && <Link href={`/life-map/${answer.relatedDomain}`} className="button button--secondary">查看相关生命领域 <span>↗</span></Link>}
       <p className="disclosure">{answer.disclaimer}</p>
@@ -662,24 +739,30 @@ function IChingPage() {
 }
 
 function TimingPage() {
+  const { experience, calculationError } = useActiveExperience();
+  if (!experience) return <ErrorState route="timing" title="当前时运无法完成计算" message={calculationError ?? "请检查出生资料。"} href="/onboarding" action="检查出生资料" />;
+  const timing = experience.timing;
   return (
     <PageShell route="timing">
       <div className="page timing-page">
         <header className="page-heading"><p className="eyebrow">YOUR CURRENT SEASON · 当前时运</p><h1>{timing.title}</h1><p>{timing.summary}</p></header>
-        <section className="timeline-large"><div className="timeline-years"><span>过去</span><span>现在</span><span>近期</span></div><div className="timeline-track" style={{ "--timeline-position": `${timing.nowPosition * 100}%` } as React.CSSProperties}><i style={{ left: `${timing.nowPosition * 100}%` }}><b>NOW</b></i></div><div className="timeline-periods"><article><small>2026.01—06</small><h3>旧结构松动</h3><p>观察什么正在失去意义。</p></article><article className="is-current"><small>{timing.start}—{timing.end}</small><h3>{timing.title}</h3><p>{timing.summary}</p></article><article><small>{timing.nextTransition.date}</small><h3>{timing.nextTransition.title}</h3><p>{timing.nextTransition.summary}</p></article></div></section>
-        <section className="section-block"><SectionHeader eyebrow="DOMAIN ACTIVATION · 演示" title="哪些主题正在被强调" /><div className="signal-list">{timing.signals.map((signal, index) => <article key={signal.id}><div><span>{signal.label}</span><small>{signal.strength === "very-active" ? "很活跃" : signal.strength === "active" ? "活跃" : "出现中"}</small></div><i><b style={{ "--signal-width": `${signal.internalStrength * 100}%`, "--signal-delay": `${index * 90}ms` } as React.CSSProperties} /></i><p>{signal.summary}</p></article>)}</div><p className="inline-notice">{timing.disclaimer}</p></section>
-        <section className="reflection-card"><span aria-hidden="true">时</span><div><p className="eyebrow">THIS SEASON&apos;S PRACTICE</p><h2>为一个真正值得的承诺留出结构</h2><Link href="/ask?prompt=这个阶段我最值得保留什么承诺？" className="button button--primary">围绕当前阶段提问</Link></div></section>
+        <section className="timeline-large"><div className="timeline-years"><span>月初</span><span>现在</span><span>下月</span></div><div className="timeline-track" style={{ "--timeline-position": `${timing.nowPosition * 100}%` } as React.CSSProperties}><i style={{ left: `${timing.nowPosition * 100}%` }}><b>NOW</b></i></div><div className="timeline-periods"><article><small>{timing.start}</small><h3>本月计算起点</h3><p>以当前公历月为边界保存一张可复算快照。</p></article><article className="is-current"><small>{timing.start}—{timing.end}</small><h3>{timing.title}</h3><p>{timing.summary}</p></article><article><small>{timing.nextTransition.date}</small><h3>{timing.nextTransition.title}</h3><p>{timing.nextTransition.summary}</p></article></div></section>
+        <section className="section-block"><SectionHeader eyebrow="DOMAIN ACTIVATION · 已计算" title="哪些主题留下较多线索" /><div className="signal-list">{timing.signals.map((signal, index) => <article key={signal.id}><div><span>{signal.label}</span><small>{signal.strength === "very-active" ? "多源线索" : signal.strength === "active" ? "可见线索" : "背景线索"}</small></div><i><b style={{ "--signal-width": `${signal.internalStrength * 100}%`, "--signal-delay": `${index * 90}ms` } as React.CSSProperties} /></i><p>{signal.summary}</p></article>)}</div><p className="inline-notice">{timing.disclaimer}</p></section>
+        <section className="reading-section"><SectionHeader eyebrow={`AS OF ${timing.asOf}`} title="时运依据来自哪里" /><EvidenceList evidence={timing.evidence} experience={experience} /></section>
+        <section className="reflection-card"><span aria-hidden="true">时</span><div><p className="eyebrow">THIS PERIOD&apos;S PRACTICE</p><h2>{experience.todayInsight.reflectionPrompt}</h2><Link href={`/ask?prompt=${encodeURIComponent("这个阶段我最值得留意什么？")}`} className="button button--primary">围绕当前阶段提问</Link></div></section>
       </div>
     </PageShell>
   );
 }
 
 function ReportPage() {
-  const reading = useActiveBaziReading();
-  const report = useMemo(() => buildLifeMapReport(reading), [reading]);
+  const { reading, experience, calculationError } = useActiveExperience();
+  const report = useMemo(() => experience ? buildLifeMapReport(experience, experience.calculatedFor) : null, [experience]);
   const [checkoutState, setCheckoutState] = useState<"idle" | "loading" | "error">("idle");
   const [checkoutMessage, setCheckoutMessage] = useState("");
   const storefrontConfigured = Boolean(process.env.NEXT_PUBLIC_SHOPIFY_STOREFRONT_TOKEN?.trim());
+
+  if (!experience || !report) return <ErrorState route="report" title="完整报告无法生成" message={calculationError ?? "请检查出生资料。"} href="/onboarding" action="检查出生资料" />;
 
   const beginCheckout = async () => {
     setCheckoutState("loading");
@@ -701,7 +784,7 @@ function ReportPage() {
           <div>
             <p className="eyebrow">YOUR PRIVATE EDITION · 私人版本</p>
             <h1>{report.title}</h1>
-            <p>报告已在当前浏览器内根据你的确定性四柱事实生成。Shopify 只接收商品、数量与价格，不接收任何出生资料或命盘内容。</p>
+            <p>报告已在当前浏览器内根据八字、紫微、西占与当前时运的确定性事实生成。Shopify 只接收商品、数量与价格，不接收出生资料或命盘内容。</p>
             <div className="report-intro__actions">
               <button className="button button--primary" type="button" onClick={beginCheckout} disabled={checkoutState === "loading"}>
                 {checkoutState === "loading" ? "正在连接 Shopify…" : "购买正式 PDF · USD $2"}
@@ -709,7 +792,7 @@ function ReportPage() {
               <button className="button button--secondary" type="button" onClick={() => window.print()}>保存本地预览</button>
               <a className="button button--tertiary" href="/downloads/life-map-full-daily-report-sample.pdf" download>下载演示 PDF</a>
             </div>
-            <p className="report-privacy">安全结账由 Shopify 提供。此版本不会把姓名、生日、出生时间、地点或四柱写入订单。</p>
+            <p className="report-privacy">安全结账由 Shopify 提供。此版本不会把姓名、生日、出生时间、地点或任何命盘事实写入订单。</p>
             {!storefrontConfigured && <p className="inline-notice">商店目前使用受保护的预览模式；Shopify 可能先显示店铺密码页。正式上线前需在 Shopify 后台解除 Online Store 密码，或配置公开 Storefront token。</p>}
             {checkoutState === "error" && <p className="inline-notice" role="alert">{checkoutMessage}</p>}
           </div>
@@ -717,14 +800,14 @@ function ReportPage() {
             <span>FULL REPORT</span>
             <strong>$2</strong>
             <small>USD · DIGITAL PRODUCT</small>
-            <dl><div><dt>页数</dt><dd>{report.pages.length}</dd></div><div><dt>引擎</dt><dd>v{reading.engine.version}</dd></div><div><dt>隐私</dt><dd>Browser only</dd></div></dl>
+            <dl><div><dt>页数</dt><dd>{report.pages.length}</dd></div><div><dt>引擎</dt><dd>4 versioned</dd></div><div><dt>隐私</dt><dd>Browser only</dd></div></dl>
           </aside>
         </header>
 
         <div className="report-boundary"><span>FACT</span><p>命盘事实来自版本化引擎</p><span>REFLECTION</span><p>传统主题是可质疑的观察角度</p><span>PRACTICE</span><p>练习不需要购买任何物品</p></div>
 
         <section className="report-preview" aria-label="完整报告预览">
-          <div className="report-preview__heading"><p className="eyebrow">MULTI-PAGE PREVIEW</p><h2>八页报告已经准备好</h2><p>购买的是这份正式数字版报告；当前页面同时作为隐私优先的本地生成预览。</p></div>
+          <div className="report-preview__heading"><p className="eyebrow">MULTI-PAGE PREVIEW</p><h2>十页跨体系报告已经准备好</h2><p>购买的是这份正式数字版报告；当前页面同时作为隐私优先的本地生成预览。</p></div>
           {report.pages.map((page) => (
             <article className={`report-sheet report-sheet--${page.id}`} key={page.id}>
               <header>
@@ -733,7 +816,7 @@ function ReportPage() {
               </header>
               <div className="report-sheet__title"><h2>{page.title}</h2><p>{page.subtitle}</p></div>
               {page.id === "cover" && <div className="report-cover-mark" aria-label={`日主 ${reading.dayMaster.stem}`}><i /><strong>{reading.dayMaster.stem}</strong><span>{reading.dayMaster.polarity}{reading.dayMaster.element}</span></div>}
-              {page.id === "elements" && <div className="report-element-bars" role="img" aria-label={elementOrder.map((element) => `${element} ${reading.visibleElementCounts[element]}`).join("，")}>{elementOrder.map((element) => <div key={element}><span>{element}<small>{elementEnglish[element]}</small></span><i><b style={{ width: `${(reading.visibleElementCounts[element] / Math.max(1, ...Object.values(reading.visibleElementCounts))) * 100}%`, "--element-color": elementColor[element] } as React.CSSProperties} /></i><strong>{reading.visibleElementCounts[element]}</strong></div>)}</div>}
+              {page.id === "pillars" && <div className="report-element-bars" role="img" aria-label={elementOrder.map((element) => `${element} ${reading.visibleElementCounts[element]}`).join("，")}>{elementOrder.map((element) => <div key={element}><span>{element}<small>{elementEnglish[element]}</small></span><i><b style={{ width: `${(reading.visibleElementCounts[element] / Math.max(1, ...Object.values(reading.visibleElementCounts))) * 100}%`, "--element-color": elementColor[element] } as React.CSSProperties} /></i><strong>{reading.visibleElementCounts[element]}</strong></div>)}</div>}
               <div className="report-sheet__blocks">{page.blocks.map((block) => <section className={`report-block report-block--${block.kind}`} key={block.id}><span>{block.label}</span><h3>{block.title}</h3><p>{block.body}</p></section>)}</div>
               <footer><span>Life Map · Personal reflection</span><b>{report.generatedOn}</b></footer>
             </article>
@@ -766,7 +849,8 @@ function ProductPage({ id }: { id?: string }) {
 }
 
 function MePage() {
-  const reading = useActiveBaziReading();
+  const { reading, experience, calculationError } = useActiveExperience();
+  if (!experience) return <ErrorState route="me" title="出生档案无法完成计算" message={calculationError ?? "请检查出生资料。"} href="/onboarding" action="检查出生资料" />;
   const clearProfile = () => {
     clearBirthProfile();
     navigate("/onboarding");
@@ -774,11 +858,11 @@ function MePage() {
   return (
     <PageShell route="me">
       <div className="page me-page">
-        <header className="profile-hero"><div className="profile-monogram">{reading.profile.displayName.slice(0, 1).toUpperCase()}</div><div><p className="eyebrow">YOUR PRIVATE SPACE · 你的内在空间</p><h1>{reading.profile.displayName}</h1><p>八字已计算 · 其他体系仍为演示</p></div></header>
-        <section className="profile-card"><SectionHeader eyebrow="BIRTH PROFILE" title="出生信息" /><dl><div><dt>出生日期</dt><dd>{reading.profile.birthDate}</dd></div><div><dt>出生时间</dt><dd>{reading.profile.birthTime ?? "未知"}</dd></div><div><dt>出生地点</dt><dd>{reading.place.label}</dd></div><div><dt>时区</dt><dd>{reading.place.timeZone}</dd></div><div><dt>状态</dt><dd><span className="calculation-label">八字已排盘</span></dd></div></dl><Link href="/onboarding" className="text-link">重新输入资料 →</Link></section>
+        <header className="profile-hero"><div className="profile-monogram">{reading.profile.displayName.slice(0, 1).toUpperCase()}</div><div><p className="eyebrow">YOUR PRIVATE SPACE · 你的内在空间</p><h1>{reading.profile.displayName}</h1><p>八字 · 紫微 · 西占 · 时运均使用本地计算</p></div></header>
+        <section className="profile-card"><SectionHeader eyebrow="BIRTH PROFILE" title="出生信息" /><dl><div><dt>出生日期</dt><dd>{reading.profile.birthDate}</dd></div><div><dt>出生时间</dt><dd>{reading.profile.birthTime ?? "未知"}</dd></div><div><dt>出生地点</dt><dd>{reading.place.label}</dd></div><div><dt>时区</dt><dd>{reading.place.timeZone}</dd></div><div><dt>状态</dt><dd><span className="calculation-label">三体系计算完成</span></dd></div></dl><Link href="/onboarding" className="text-link">重新输入资料 →</Link></section>
         <BaziChartCard reading={reading} />
-        <section className="menu-list"><Link href="/report"><span>完整每日报告</span><small>生成八页私人 PDF · USD $2</small><b>→</b></Link><Link href="/objects"><span>象征物收藏</span><small>查看所有演示物品</small><b>→</b></Link><button disabled><span>关系档案</span><small>后续阶段开放</small><b>即将开放</b></button><button disabled><span>通知与每日提醒</span><small>后续阶段开放</small><b>即将开放</b></button></section>
-        <section className="trust-card"><p className="eyebrow">TRUST & PRIVACY</p><h2>你的信息，只留在这次浏览会话</h2><p>出生资料只保存在当前浏览器会话中，不会上传、写入账户或发送分析事件。关闭会话后浏览器会清除它。</p><ul><li>八字四柱由确定性引擎在浏览器内计算</li><li>紫微、西占与综合解释仍明确标注为演示</li><li>没有实时 AI、支付或追踪</li></ul><button className="text-button text-button--danger" onClick={clearProfile}>清除本次出生资料</button></section>
+        <section className="menu-list"><Link href="/report"><span>完整每日报告</span><small>生成十页跨体系私人 PDF · USD $2</small><b>→</b></Link><Link href="/objects"><span>象征物收藏</span><small>查看所有演示物品</small><b>→</b></Link><button disabled><span>关系档案</span><small>后续阶段开放</small><b>即将开放</b></button><button disabled><span>通知与每日提醒</span><small>后续阶段开放</small><b>即将开放</b></button></section>
+        <section className="trust-card"><p className="eyebrow">TRUST & PRIVACY</p><h2>你的信息，只留在这次浏览会话</h2><p>出生资料只保存在当前浏览器会话中，不会上传、写入账户或发送分析事件。关闭会话后浏览器会清除它。</p><ul><li>八字、紫微和西占由版本锁定的本地引擎计算</li><li>时运使用 {experience.calculatedFor} 的干支、紫微运限与行星角距快照</li><li>综合解释由规则生成，不调用实时 AI 或追踪</li></ul><button className="text-button text-button--danger" onClick={clearProfile}>清除本次出生资料</button></section>
       </div>
     </PageShell>
   );

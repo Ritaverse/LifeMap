@@ -108,7 +108,7 @@ def page_background(c: canvas.Canvas, page_no: int, section: str) -> None:
     c.setFillColor(GOLD)
     c.drawString(44, PAGE_H - 48, section.upper())
     c.setFillColor(MUTED)
-    c.drawRightString(PAGE_W - 44, PAGE_H - 48, f"{page_no:02d} / 08")
+    c.drawRightString(PAGE_W - 44, PAGE_H - 48, f"{page_no:02d} / 10")
 
 
 def footer(c: canvas.Canvas, page_no: int) -> None:
@@ -152,7 +152,7 @@ def draw_cover(c: canvas.Canvas) -> None:
     page_background(c, 1, "Life Map · Private Edition")
     c.setFont(FONT_BOLD, 8)
     c.setFillColor(GOLD)
-    c.drawString(44, PAGE_H - 116, "DETERMINISTIC CHART · REFLECTIVE READING")
+    c.drawString(44, PAGE_H - 116, "THREE CHART SYSTEMS · CURRENT TIMING · RULE SYNTHESIS")
     c.setFont(FONT_BOLD, 36)
     c.setFillColor(PAPER)
     c.drawString(44, PAGE_H - 167, "完整每日反思报告")
@@ -182,10 +182,10 @@ def draw_cover(c: canvas.Canvas) -> None:
     c.setFont(FONT_BOLD, 19)
     c.setFillColor(PAPER)
     c.drawString(44, 160, "Yu 的人生地图")
-    paragraph(c, "确定性四柱事实 × 克制的传统反思 × 可实践的日常问题", 44, 137, PAGE_W - 88, 10, 16)
+    paragraph(c, "八字 × 紫微 × 西占 × 当前时运 × 可追溯规则综合", 44, 137, PAGE_W - 88, 10, 16)
     c.setFont(FONT, 7.5)
     c.setFillColor(MUTED)
-    c.drawString(44, 86, "SAMPLE DATA · lunar-typescript v1.8.6 · life-map.bazi.v1")
+    c.drawString(44, 86, "SAMPLE DATA · BAZI 1.8.6 · IZTRO 2.6.1 · CELESTINE 0.2.1")
     footer(c, 1)
     c.showPage()
 
@@ -198,9 +198,9 @@ def draw_method(c: canvas.Canvas) -> None:
     gap = 12
     w = (PAGE_W - 88 - gap) / 2
     block(c, 44, top, w, 166, "PRIVATE BY DESIGN", "出生资料留在浏览器", "姓名、生日、时间、地点与命盘内容不会发送给 Shopify。购买请求只包含商品 variant、数量与非个人化标签。", JADE)
-    block(c, 44 + w + gap, top, w, 166, "ENGINE", "版本化四柱计算", "年界采用立春；月界采用节气中的“节”；日界采用出生地当地民用时间 00:00。", GOLD)
-    block(c, 44, top - 182, w, 166, "CURRENT SCOPE", "只把八字视为真实计算", "紫微斗数、西方占星、真实时运与实时 AI 尚未进入本报告，不会伪装成已计算结论。", CINNABAR)
-    block(c, 44 + w + gap, top - 182, w, 166, "READING BOUNDARY", "事实与解释分开", "CALCULATED FACT、TRADITIONAL REFLECTION 与 PRACTICE 使用不同标签，方便逐项核对。", JADE)
+    block(c, 44 + w + gap, top, w, 166, "VERSIONED ENGINES", "三套命盘真实计算", "八字、紫微和西占分别由锁定版本的本地引擎计算；当前时运使用明确日期快照。", GOLD)
+    block(c, 44, top - 182, w, 166, "RULE SYNTHESIS", "综合洞察不是实时 AI", "规则层只连接稳定事实 ID；多体系同向才标记共识，不一致时保留张力。", CINNABAR)
+    block(c, 44 + w + gap, top - 182, w, 166, "READING BOUNDARY", "事实与解释分开", "事实、传统反思与练习使用不同标签，方便逐项核对。", JADE)
     footer(c, 2)
     c.showPage()
 
@@ -266,6 +266,115 @@ def draw_elements(c: canvas.Canvas) -> None:
     c.showPage()
 
 
+def draw_ziwei(c: canvas.Canvas) -> None:
+    page_background(c, 4, "03 · Zi Wei")
+    y = title(c, "紫微十二宫", "Natal palaces and major stars")
+    paragraph(c, "以下宫位与星曜来自版本锁定的排盘引擎。它们是传统结构记录，不是事件结果或科学测量。", 44, y, PAGE_W - 88, 10.5, 17)
+    block(c, 44, y - 72, PAGE_W - 88, 108, "CALCULATED FACT", "命宫丑 · 身宫亥 · 火六局", "命主巨门 · 身主火星 · 农历一九九〇年五月廿五 · 生肖马。", JADE)
+    palaces = [
+        ("命宫", "紫微、破军"), ("兄弟", "天机"), ("夫妻", "天府"),
+        ("子女", "太阳、太阴"), ("财帛", "武曲、贪狼"), ("疾厄", "天同、巨门"),
+        ("迁移", "天相"), ("仆役", "天梁"), ("官禄", "廉贞、七杀"),
+        ("田宅", "无十四主星"), ("福德", "无十四主星"), ("父母", "无十四主星"),
+    ]
+    top = y - 205
+    w = (PAGE_W - 112) / 3
+    h = 82
+    for index, (name, stars) in enumerate(palaces):
+        row, col = divmod(index, 3)
+        x = 44 + col * (w + 12)
+        yy = top - row * (h + 10)
+        block(c, x, yy, w, h, f"PALACE {index + 1:02d}", name, stars, GOLD if name == "命宫" else JADE)
+    footer(c, 4)
+    c.showPage()
+
+
+def draw_western(c: canvas.Canvas) -> None:
+    page_background(c, 5, "04 · Western natal")
+    y = title(c, "西方本命盘", "Tropical zodiac · whole-sign houses")
+    paragraph(c, "历史 IANA 时区把上海样本时间解析为 UTC+9；行星、角点与相位均来自本地星历计算。", 44, y, PAGE_W - 88, 10.5, 17)
+    cx, cy = 170, y - 220
+    for radius in (118, 88, 55):
+        c.setStrokeColor(alpha(GOLD if radius != 88 else JADE, 0.55))
+        c.circle(cx, cy, radius, fill=0, stroke=1)
+    for angle in range(0, 360, 30):
+        r = math.radians(angle)
+        c.line(cx + math.cos(r) * 88, cy + math.sin(r) * 88, cx + math.cos(r) * 118, cy + math.sin(r) * 118)
+    c.setFont(FONT_BOLD, 29)
+    c.setFillColor(PAPER)
+    c.drawCentredString(cx, cy - 8, "ASC")
+    c.setFont(FONT_BOLD, 7)
+    c.setFillColor(GOLD)
+    c.drawCentredString(cx, cy - 28, "LEO 12°")
+    x = 320
+    placements = [("太阳", "双子 25° · H11"), ("月亮", "白羊 6° · H9"), ("水星", "双子 8° · H11"), ("金星", "金牛 20° · H10"), ("火星", "白羊 12° · H9"), ("天顶", "金牛 6°")]
+    for index, (body, value) in enumerate(placements):
+        yy = y - 78 - index * 66
+        c.setFont(FONT_BOLD, 7)
+        c.setFillColor(MUTED)
+        c.drawString(x, yy, body)
+        c.setFont(FONT_BOLD, 12)
+        c.setFillColor(PAPER)
+        c.drawString(x, yy - 21, value)
+        c.setStrokeColor(LINE)
+        c.line(x, yy - 34, PAGE_W - 44, yy - 34)
+    block(c, 44, 142, PAGE_W - 88, 88, "LIMITATION", "位置是计算，解释是传统语言", "采用热带黄道与整宫制；角点依赖出生时间。符号解释不等于人格测量或结果判断。", CINNABAR)
+    footer(c, 5)
+    c.showPage()
+
+
+def draw_timing(c: canvas.Canvas) -> None:
+    page_background(c, 6, "05 · Current timing")
+    y = title(c, "2026.09 · 结构与边界", "A dated, reproducible snapshot")
+    paragraph(c, "本页只描述目标日的干支年月、紫微运限和行星角距。快照不是事件预言或好运评分。", 44, y, PAGE_W - 88, 10.5, 17)
+    items = [
+        ("八字 · CURRENT FACT", "丙午年 · 丁酉月", "目标日 2026-09-20 的节气月柱与年柱。"),
+        ("紫微 · CURRENT FACT", "流年与流月宫位", "目标日期对应的流年、流月宫位与四化记录。"),
+        ("西占 · CURRENT FACT", "土星三分本命上升", "目标日中午快照；容许度约 0.3°。"),
+    ]
+    top = y - 70
+    for index, (label, heading, body) in enumerate(items):
+        block(c, 44, top - index * 146, PAGE_W - 88, 128, label, heading, body, [JADE, GOLD, CINNABAR][index])
+    block(c, 44, top - 438, PAGE_W - 88, 105, "TIMING BOUNDARY", "活跃只表示证据密度", "它不是好运、坏运、事件概率或结果保证；进入下个月后会重新计算。", GOLD)
+    footer(c, 6)
+    c.showPage()
+
+
+def draw_synthesis(c: canvas.Canvas) -> None:
+    page_background(c, 7, "06 · Synthesis")
+    y = title(c, "结构 · 边界", "Rule synthesis with traceable evidence")
+    paragraph(c, "只有两个或以上体系共享同一主题时才称为共识；规则不会把分歧平均成一个命运分数。", 44, y, PAGE_W - 88, 10.5, 17)
+    block(c, 44, y - 72, PAGE_W - 88, 126, "CONSENSUS · THREE SYSTEMS", "先让承诺变得清楚", "多个计算来源同时留下秩序、判断或边界线索。这里提供的是可验证的反思方向，不保证外界结果。", CINNABAR)
+    evidence = [
+        ("八字 · EVIDENCE", "当前干支年月", "以明确目标日计算，提供当月传统背景。"),
+        ("紫微 · EVIDENCE", "运限宫位", "记录流年与流月落宫，不转换成事件预言。"),
+        ("西占 · EVIDENCE", "行运角距", "记录行运行星与本命点的几何关系。"),
+    ]
+    top = y - 224
+    w = (PAGE_W - 112) / 3
+    for index, (label, heading, body) in enumerate(evidence):
+        block(c, 44 + index * (w + 12), top, w, 180, label, heading, body, JADE)
+    block(c, 44, top - 198, PAGE_W - 88, 126, "REFLECTION PROMPT", "哪一条边界说清楚后，会让你更安心？", "先写下答案，再补一句：我有哪些现实事实支持这个感受？", GOLD)
+    footer(c, 7)
+    c.showPage()
+
+
+def draw_domains(c: canvas.Canvas) -> None:
+    page_background(c, 8, "07 · Life domains")
+    y = title(c, "八个生命领域", "Themes, not scores")
+    paragraph(c, "每个领域都使用同一组已计算事实；共识、张力与独立线索分别标注。", 44, y, PAGE_W - 88, 10.5, 17)
+    domains = [("自我", "探索 · 重构"), ("事业", "结构 · 边界"), ("财富", "资源 · 配置"), ("爱情", "靠近 · 留白"), ("家庭", "观察 · 回应"), ("关系", "靠近 · 留白"), ("创造力", "表达 · 被看见"), ("内在成长", "观察 · 回应")]
+    top = y - 65
+    w = (PAGE_W - 100) / 2
+    for index, (name, theme) in enumerate(domains):
+        row, col = divmod(index, 2)
+        x = 44 + col * (w + 12)
+        yy = top - row * 119
+        block(c, x, yy, w, 103, f"DOMAIN {index + 1:02d}", name, theme, JADE if index % 2 == 0 else GOLD)
+    footer(c, 8)
+    c.showPage()
+
+
 def draw_lens(c: canvas.Canvas) -> None:
     page_background(c, 5, "04 · Traditional lens")
     y = title(c, "感知与流动", "A traditional lens for Yin Water")
@@ -292,13 +401,13 @@ def draw_lens(c: canvas.Canvas) -> None:
 
 
 def draw_practice(c: canvas.Canvas) -> None:
-    page_background(c, 6, "05 · Seven-day practice")
+    page_background(c, 9, "08 · Seven-day practice")
     y = title(c, "把观察带进七天", "One small practice at a time")
     paragraph(c, "这套练习不需要购买任何象征物，也不承诺改变运气或结果。", 44, y, PAGE_W - 88, 10.5, 17)
     items = [
-        ("DAY 1–2", "观察", "记下一次能量最集中与最分散的时刻，不急着解释原因。"),
-        ("DAY 3–4", "取舍", "暂停一个低价值承诺，把空出的时间留给最重要的一件事。"),
-        ("DAY 5–6", "表达", "向相关的人说清一个需要、一个边界或一个尚未确定的问题。"),
+        ("DAY 1-2", "观察", "记下一次能量最集中与最分散的时刻，不急着解释原因。"),
+        ("DAY 3-4", "取舍", "暂停一个低价值承诺，把空出的时间留给最重要的一件事。"),
+        ("DAY 5-6", "表达", "向相关的人说清一个需要、一个边界或一个尚未确定的问题。"),
         ("DAY 7", "回看", "写下最可靠的一条观察，以及仍然无法确认的一点。"),
     ]
     c.setStrokeColor(alpha(GOLD, 0.42))
@@ -315,7 +424,7 @@ def draw_practice(c: canvas.Canvas) -> None:
         c.setFillColor(PAPER)
         c.drawString(104, yy - 4, heading)
         paragraph(c, body, 104, yy - 27, PAGE_W - 158, 9, 15, PAPER_SOFT, max_lines=3)
-    footer(c, 6)
+    footer(c, 9)
     c.showPage()
 
 
@@ -341,13 +450,13 @@ def draw_journal(c: canvas.Canvas) -> None:
 
 
 def draw_appendix(c: canvas.Canvas) -> None:
-    page_background(c, 8, "07 · Notes & limits")
+    page_background(c, 10, "09 · Notes & limits")
     y = title(c, "计算说明与限制", "What this version can and cannot say")
     items = [
         ("TIME BASIS", "四柱按出生地当地民用时间计算，尚未应用真太阳时校正。"),
         ("ELEMENT COUNTS", "五行数量仅统计八个表层干支，不代表旺衰、喜用神或吉凶评分。"),
         ("LOCATION RECORD", "Shanghai, China · Asia/Shanghai · 31.2304, 121.4737（虚构演示资料）"),
-        ("ENGINE RECORD", "lunar-typescript v1.8.6 · life-map.bazi.v1 · Sample date 2026-09-19"),
+        ("ENGINE RECORD", "BaZi 1.8.6 · iztro 2.6.1 · celestine 0.2.1 · rules 1.0.0"),
     ]
     top = y - 30
     for index, (label, body) in enumerate(items):
@@ -356,7 +465,7 @@ def draw_appendix(c: canvas.Canvas) -> None:
     c.setStrokeColor(alpha(CINNABAR, 0.45))
     c.roundRect(44, 83, PAGE_W - 88, 64, 12, fill=1, stroke=1)
     paragraph(c, "本报告用于个人反思与传统文化探索，不是科学预测，也不提供医疗、法律、财务、生育、死亡或安全建议。", 60, 121, PAGE_W - 120, 8.5, 14, PAPER_SOFT, max_lines=3)
-    footer(c, 8)
+    footer(c, 10)
     c.showPage()
 
 
@@ -365,15 +474,17 @@ def build_pdf() -> None:
     c = canvas.Canvas(str(OUTPUT), pagesize=A4, pageCompression=1)
     c.setTitle("Life Map Full Daily Reflection Report · Sample")
     c.setAuthor("Life Map")
-    c.setSubject("A privacy-first, multi-page BaZi reflection report sample")
+    c.setSubject("A privacy-first, multi-system daily reflection report sample")
     c.setCreator("Life Map deterministic report generator")
     draw_cover(c)
     draw_method(c)
     draw_pillars(c)
-    draw_elements(c)
-    draw_lens(c)
+    draw_ziwei(c)
+    draw_western(c)
+    draw_timing(c)
+    draw_synthesis(c)
+    draw_domains(c)
     draw_practice(c)
-    draw_journal(c)
     draw_appendix(c)
     c.save()
     print(f"Created {OUTPUT}")

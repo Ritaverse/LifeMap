@@ -7,7 +7,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const host = requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host") ?? "localhost:3000";
   const protocol = requestHeaders.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
   const socialImage = `${protocol}://${host}/og.png`;
-  const description = "东方命理、西方占星与 AI 解释共同构成的当代个人反思体验。";
+  const description = "八字、紫微、西方占星与可追溯规则综合共同构成的当代个人反思体验。";
 
   return {
     title: { default: "Life Map · 人生地图", template: "%s · Life Map" },

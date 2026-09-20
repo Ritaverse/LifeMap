@@ -36,9 +36,12 @@ test("server-renders the private multi-page report and $2 Shopify handoff", asyn
   const response = await render("/report");
   assert.equal(response.status, 200);
   const html = await response.text();
-  assert.match(html, /完整每日反思报告/);
+  assert.match(html, /完整跨体系每日反思报告/);
   assert.match(html, /购买正式 PDF · USD \$2/);
-  assert.match(html, /八页报告已经准备好/);
+  assert.match(html, /十页跨体系报告已经准备好/);
+  assert.match(html, /紫微十二宫/);
+  assert.match(html, /西方本命盘/);
+  assert.match(html, /综合洞察不是实时 AI/);
   assert.match(html, /Shopify 只接收商品、数量与价格/);
   assert.match(html, /不是科学预测/);
   assert.doesNotMatch(html, /storefront-access-token/i);
@@ -55,7 +58,9 @@ test("server-renders the interactive BaZi chart from calculated facts", async ()
   assert.match(html, /数量只描述表层干支/);
   assert.match(html, /VISIBLE ELEMENTS · 表层五行/);
   assert.match(html, /表层五行数量：/);
-  assert.doesNotMatch(html, /<svg\b/i);
+  assert.match(html, /ZI WEI DOU SHU · 紫微斗数/);
+  assert.match(html, /WESTERN NATAL · 西方占星/);
+  assert.match(html, /<svg\b/i);
 });
 
 test("server-renders original product imagery with useful alternative text", async () => {
