@@ -24,6 +24,9 @@ interface MotifCopy {
 
 export interface ExperienceTiming extends TimingPeriod {
   asOf: string;
+  themeSubtitle: string;
+  reflectionPrompt: string;
+  practice: string;
   evidence: EvidenceRef[];
   facts: ChartFact[];
 }
@@ -367,6 +370,9 @@ function buildTiming(profile: BirthProfileInput, bazi: BaziReading, ziwei: Ziwei
     id: `calculated-timing-${targetDate.slice(0, 7)}`,
     asOf: targetDate,
     title: copy.title,
+    themeSubtitle: copy.subtitle,
+    reflectionPrompt: copy.prompt,
+    practice: copy.practice,
     start: `${year}.${String(month).padStart(2, "0")}.01`,
     end: `${year}.${String(month).padStart(2, "0")}.${String(monthEnd(targetDate)).padStart(2, "0")}`,
     nowPosition: Math.max(0, Math.min(1, (day - 1) / Math.max(1, monthEnd(targetDate) - 1))),
@@ -405,9 +411,11 @@ export function buildCalculatedExperience(bazi: BaziReading, targetDate: string)
     id: "calculated-today",
     domain: "timing",
     eyebrow: "今日综合 · 已计算",
+    title: timing.title,
+    subtitle: timing.themeSubtitle,
     evidence: timing.evidence,
     summary: timing.summary,
-    reflectionPrompt: motifCopy[chooseMotif(natalFacts.filter((fact) => fact.domain === todayBase.domain), bazi, ziwei, western, todayBase.domain as DomainId).motif].prompt,
+    reflectionPrompt: timing.reflectionPrompt,
   };
   const facts = [...natalFacts, ...timing.facts];
   return {
@@ -468,14 +476,14 @@ export function getChartExplanationPreview(experience: CalculatedExperience, sys
   };
 }
 
-export function routeCalculatedAsk(input: string, experience: CalculatedExperience): AskResponse {
+export function routeCalculatedAsk(input: string, experience: CalculatedExperience, domainHint?: DomainId): AskResponse {
   const normalized = input.toLowerCase();
   const category =
     /career|work|job|工作|职业|换工作/.test(normalized) ? "career-transition" :
     /relationship|partner|关系|感情|冲突/.test(normalized) ? "relationship-pattern" :
     /start|new|begin|开始|新项目/.test(normalized) ? "new-beginning" :
     /conflict|contradiction|矛盾|拉扯/.test(normalized) ? "internal-tension" : "general";
-  const domain: DomainId = category === "career-transition" ? "career" : category === "relationship-pattern" ? "relationships" : category === "new-beginning" ? "creativity" : category === "internal-tension" ? "identity" : experience.todayInsight.domain === "timing" ? "identity" : experience.todayInsight.domain;
+  const domain: DomainId = domainHint ?? (category === "career-transition" ? "career" : category === "relationship-pattern" ? "relationships" : category === "new-beginning" ? "creativity" : category === "internal-tension" ? "identity" : experience.todayInsight.domain === "timing" ? "identity" : experience.todayInsight.domain);
   const insight = experience.domainInsights[domain];
   return {
     id: `calculated-ask-${category}`,

@@ -7,7 +7,9 @@ test("calculated experience derives synthesis only from calculated facts", () =>
   const first = buildCalculatedExperience(demoBaziReading, "2026-09-20");
   const second = buildCalculatedExperience(demoBaziReading, "2026-09-20");
   assert.deepEqual(first, second);
-  assert.equal(first.todayInsight.title, "探索 · 重构");
+  assert.equal(first.todayInsight.title, first.timing.title);
+  assert.equal(first.todayInsight.subtitle, first.timing.themeSubtitle);
+  assert.equal(first.todayInsight.reflectionPrompt, first.timing.reflectionPrompt);
   assert.ok(first.todayInsight.evidence.length >= 2);
   assert.ok(first.todayInsight.evidence.every((item) => item.factId.startsWith("fact-calculated-")));
   assert.equal(resolveCalculatedEvidence(first, first.todayInsight.evidence).length, first.todayInsight.evidence.length);

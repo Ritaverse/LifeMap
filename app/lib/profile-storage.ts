@@ -4,7 +4,10 @@ import type { BirthPlace, BirthProfileInput, TraditionalGender } from "./bazi.ts
 const profileKey = "life-map-birth-profile-v1";
 const draftKey = "life-map-onboarding";
 
+export type ReflectionFocus = "relationships" | "career" | "timing" | "self";
+
 export interface OnboardingDraft {
+  focus: ReflectionFocus;
   name: string;
   date: string;
   time: string;
@@ -13,6 +16,10 @@ export interface OnboardingDraft {
   selectedPlace: BirthPlace | null;
   gender: TraditionalGender;
   consent: boolean;
+}
+
+function isReflectionFocus(value: unknown): value is ReflectionFocus {
+  return ["relationships", "career", "timing", "self"].includes(String(value));
 }
 
 function isTraditionalGender(value: unknown): value is TraditionalGender {
@@ -48,6 +55,7 @@ export function clearBirthProfile() {
   sessionStorage.removeItem(profileKey);
   sessionStorage.removeItem(draftKey);
   sessionStorage.removeItem("life-map-complete");
+  sessionStorage.removeItem("life-map-focus");
 }
 
 export function readOnboardingDraft(fallback: OnboardingDraft): OnboardingDraft {
@@ -56,6 +64,7 @@ export function readOnboardingDraft(fallback: OnboardingDraft): OnboardingDraft 
   const draft = value as Partial<OnboardingDraft> & { location?: string; locationId?: string };
   const selectedPlace = isBirthPlace(draft.selectedPlace) ? draft.selectedPlace : legacyPlace(draft.locationId, draft.location) ?? fallback.selectedPlace;
   return {
+    focus: isReflectionFocus(draft.focus) ? draft.focus : fallback.focus,
     name: typeof draft.name === "string" ? draft.name : fallback.name,
     date: typeof draft.date === "string" ? draft.date : fallback.date,
     time: typeof draft.time === "string" ? draft.time : fallback.time,

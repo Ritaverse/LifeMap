@@ -46,7 +46,7 @@ test("the previous onboarding draft preserves its selected location", () => {
     gender: "prefer-not-to-say",
     consent: true,
   }));
-  const fallback = { name: "", date: "", time: "", unknownTime: false, locationQuery: "", selectedPlace: null, gender: "prefer-not-to-say", consent: false };
+  const fallback = { focus: "relationships", name: "", date: "", time: "", unknownTime: false, locationQuery: "", selectedPlace: null, gender: "prefer-not-to-say", consent: false };
 
   const draft = readOnboardingDraft(fallback);
   assert.equal(draft.selectedPlace?.label, "Taipei, Taiwan");
@@ -89,6 +89,7 @@ test("partial onboarding drafts use safe field-level fallbacks", () => {
     consent: "yes",
   }));
   const fallback = {
+    focus: "relationships",
     name: "Yu",
     date: "1990-06-17",
     time: "09:32",
@@ -109,6 +110,7 @@ test("partial onboarding drafts use safe field-level fallbacks", () => {
 test("onboarding drafts round-trip and clearing removes all session markers", () => {
   globalThis.sessionStorage = createSessionStorage();
   const draft = {
+    focus: "career",
     name: "Lin",
     date: "2000-02-29",
     time: "",

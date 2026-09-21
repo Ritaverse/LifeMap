@@ -3,17 +3,19 @@
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import type { AnchorHTMLAttributes, FormEvent, ReactNode } from "react";
-import { askResponses, iching, products, recommendation } from "../lib/data";
-import { calculateBazi, defaultBirthPlace, demoBaziReading, demoBirthProfile } from "../lib/bazi";
+import { iching, products, recommendation } from "../lib/data";
+import { calculateBazi, demoBaziReading } from "../lib/bazi";
 import type { BaziPillar, BaziReading, BirthPlace, FiveElement, PillarKind } from "../lib/bazi";
 import { buildCalculatedExperience, getChartExplanationPreview, localDateString, resolveCalculatedEvidence, routeCalculatedAsk } from "../lib/experience";
 import type { CalculatedExperience, ChartExplanationPreview } from "../lib/experience";
 import { searchBirthPlaces } from "../lib/place-search";
 import { clearBirthProfile, readBirthProfile, readOnboardingDraft, writeBirthProfile, writeOnboardingDraft } from "../lib/profile-storage";
-import type { OnboardingDraft } from "../lib/profile-storage";
+import type { OnboardingDraft, ReflectionFocus } from "../lib/profile-storage";
+import { clearReflections, readReflections, removeReflection, saveReflection } from "../lib/reflection-storage";
+import type { SavedReflection } from "../lib/reflection-storage";
 import { buildLifeMapReport } from "../lib/report";
 import { createReportCheckout } from "../lib/shopify";
-import type { AskResponse, EvidenceRef, IChingLine, Product, SystemId } from "../lib/types";
+import type { AskResponse, DomainId, EvidenceRef, IChingLine, Product, SystemId } from "../lib/types";
 import type { WesternReading } from "../lib/western";
 import type { ZiweiReading } from "../lib/ziwei";
 
@@ -40,6 +42,45 @@ const navItems = [
   { href: "/timing", key: "timing", zh: "时运", en: "Timing", mark: "时" },
   { href: "/me", key: "me", zh: "我的", en: "Me", mark: "我" },
 ];
+
+const focusOptions: Array<{ id: ReflectionFocus; label: string; title: string; description: string; prompt: string }> = [
+  { id: "relationships", label: "关系", title: "看清重复的关系模式", description: "把靠近、空间、边界和回应说得更具体。", prompt: "为什么我和亲近的人总会重复类似的冲突？" },
+  { id: "career", label: "事业", title: "梳理一个职业选择", description: "分开环境问题、角色问题和真正不能妥协的条件。", prompt: "我现在的职业处于什么阶段？" },
+  { id: "timing", label: "时机", title: "理解现在所处的阶段", description: "观察当前线索，而不是寻找一个保证结果的日期。", prompt: "这个阶段我最值得留意什么？" },
+  { id: "self", label: "自我", title: "理解内在的矛盾", description: "找出哪些需求正在拉扯，以及它们各自在保护什么。", prompt: "我的命盘里最矛盾的地方是什么？" },
+];
+
+const focusDomains: Record<ReflectionFocus, DomainId> = {
+  relationships: "relationships",
+  career: "career",
+  timing: "inner-life",
+  self: "identity",
+};
+
+function focusOption(id: ReflectionFocus) {
+  return focusOptions.find((item) => item.id === id) ?? focusOptions[0];
+}
+
+function reviewDateFromNow(days = 7) {
+  const value = new Date();
+  value.setDate(value.getDate() + days);
+  return localDateString(value);
+}
+
+function useSavedReflections() {
+  const [items, setItems] = useState<SavedReflection[]>([]);
+  useEffect(() => { queueMicrotask(() => setItems(readReflections())); }, []);
+  return { items, setItems };
+}
+
+function useSessionFocus() {
+  const [focus, setFocus] = useState<ReflectionFocus>("relationships");
+  useEffect(() => {
+    const value = sessionStorage.getItem("life-map-focus");
+    if (focusOptions.some((item) => item.id === value)) queueMicrotask(() => setFocus(value as ReflectionFocus));
+  }, []);
+  return focus;
+}
 
 function BrandMark({ large = false }: { large?: boolean }) {
   return (
@@ -108,6 +149,9 @@ function useActiveBaziReading() {
 
 function useActiveExperience() {
   const reading = useActiveBaziReading();
+  // SSR cannot know the browser's timezone. Start from the UTC calendar date so
+  // the server and first client render agree, then adopt the local day after
+  // hydration. This avoids a date-boundary hydration mismatch.
   const [targetDate, setTargetDate] = useState(() => new Date().toISOString().slice(0, 10));
   useEffect(() => {
     const localDate = localDateString();
@@ -135,10 +179,10 @@ const elementColor: Record<FiveElement, string> = {
 function PhaseScopeNotice({ experience }: { experience: CalculatedExperience }) {
   const ziweiStatus = experience.ziwei.status === "calculated" ? "紫微十二宫已排盘" : "紫微因出生时间未知而省略";
   return (
-    <aside className="phase-scope" aria-label="当前计算范围">
-      <span>计算状态</span>
+    <details className="phase-scope">
+      <summary><span aria-hidden="true">✓</span><strong>三体系已计算</strong><small>查看范围与限制</small></summary>
       <p><strong>八字、西占与当前时运均来自版本化计算。</strong> {ziweiStatus}；综合洞察由可复算规则连接证据，不调用实时 AI，也不作结果保证。</p>
-    </aside>
+    </details>
   );
 }
 
@@ -233,8 +277,7 @@ function ChartExplanation({ preview }: { preview: ChartExplanationPreview }) {
         </div>
       </div>
       <footer className="chart-explanation__footer">
-        <span>前往完整报告预览 · 正式 PDF 为 USD $2</span>
-        <Link href="/report" className="text-link" aria-label={`查看${label}详细解释，前往完整报告预览与购买页面`}>详细解释 <span aria-hidden="true">→</span></Link>
+        <span>{label} 的计算事实与阅读边界保持免费公开；报告只增加整理、打印与连续练习。</span>
       </footer>
     </aside>
   );
@@ -329,7 +372,10 @@ const westernSigns = ["♈", "♉", "♊", "♋", "♌", "♍", "♎", "♏", "�
 
 function wheelPoint(longitude: number, radius: number) {
   const angle = (longitude - 90) * Math.PI / 180;
-  return { x: 160 + Math.cos(angle) * radius, y: 160 + Math.sin(angle) * radius };
+  return {
+    x: Number((160 + Math.cos(angle) * radius).toFixed(4)),
+    y: Number((160 + Math.sin(angle) * radius).toFixed(4)),
+  };
 }
 
 function WesternChartCard({ reading, explanation }: { reading: WesternReading; explanation: ChartExplanationPreview }) {
@@ -380,25 +426,39 @@ function ErrorState({ route, title, message, href, action }: { route: RouteName;
 }
 
 function LandingPage() {
+  const [hasProfile, setHasProfile] = useState(false);
+  const [latestReflection, setLatestReflection] = useState<SavedReflection | null>(null);
+  useEffect(() => {
+    queueMicrotask(() => {
+      setHasProfile(Boolean(readBirthProfile()));
+      setLatestReflection(readReflections()[0] ?? null);
+    });
+  }, []);
   return (
     <PageShell route="landing">
       <div className="landing">
-        <header className="landing__header"><div className="wordmark"><BrandMark /><span>Life Map</span></div><button className="quiet-button" disabled>登录 · 即将开放</button></header>
+        <header className="landing__header"><div className="wordmark"><BrandMark /><span>Life Map</span></div>{hasProfile && <Link href="/today" className="quiet-button quiet-button--active">继续我的地图</Link>}</header>
         <div className="landing__geometry" aria-hidden="true"><span className="orbit" /><span className="pillars" /><span className="broken-line" /></div>
         <section className="landing__hero">
-          <p className="eyebrow">YOUR INNER ATLAS · 人生地图</p>
-          <h1>看见属于你的<br />人生地图</h1>
-          <p className="landing__lead">东方命理 × 西方占星 × AI，帮助你理解性格、关系与人生周期。</p>
+          <p className="eyebrow">A TRACEABLE REFLECTION MAP · 可追溯的人生地图</p>
+          <h1>把此刻的问题<br />看得更清楚</h1>
+          <p className="landing__lead">从八字、紫微与西方占星的确定性事实出发，寻找共识、保留张力，再把洞察变成一个可以验证的小行动。</p>
           <div className="landing__actions">
-            <Link href="/onboarding" className="button button--primary">生成我的命盘 <span aria-hidden="true">→</span></Link>
+            <Link href={hasProfile ? "/today" : "/onboarding"} className="button button--primary">{hasProfile ? "继续上次的地图" : "免费生成三体系快照"} <span aria-hidden="true">→</span></Link>
             <a href="#principles" className="button button--tertiary">了解我们如何解释</a>
           </div>
-          <p className="disclosure">基于传统解释体系的个人反思体验，不是科学预测或结果保证。</p>
+          <p className="landing__proof">约 2 分钟 · 无需注册 · 每条重要结论都能查看依据</p>
+          <p className="disclosure">基于传统解释体系的个人反思体验，不是科学预测、专业建议或结果保证。</p>
+        </section>
+        {latestReflection && <section className="return-card"><div><p className="eyebrow">CONTINUE YOUR THREAD · 继续上次的问题</p><h2>{latestReflection.question}</h2><p>你为这件事保存了一个行动，可以回到地图继续观察和复盘。</p></div><Link href="/today" className="button button--secondary">继续查看</Link></section>}
+        <section className="landing__intentions" aria-labelledby="landing-intentions-title">
+          <div><p className="eyebrow">START WITH WHAT MATTERS</p><h2 id="landing-intentions-title">你现在最想看清什么？</h2></div>
+          <div className="intent-grid">{focusOptions.map((option) => <Link href={`/onboarding?intent=${option.id}`} key={option.id}><span>{option.label}</span><h3>{option.title}</h3><p>{option.description}</p><b aria-hidden="true">→</b></Link>)}</div>
         </section>
         <section id="principles" className="landing__principles" aria-label="产品原则">
-          <article><span>01</span><h2>三个体系</h2><p>把八字、紫微与西方占星放在同一张可理解的地图上。</p></article>
-          <article><span>02</span><h2>有据可循</h2><p>每个重要洞察都能展开查看来源、传统解释与综合判断。</p></article>
-          <article><span>03</span><h2>留有余地</h2><p>呈现主题、张力与反思提示，不用确定性语言替你做决定。</p></article>
+          <article><span>01</span><h2>先计算</h2><p>版本化引擎先生成八字、紫微与西占事实，不让语言模型代替排盘。</p></article>
+          <article><span>02</span><h2>再解释</h2><p>每条重要洞察都能展开查看事实、传统解释、综合作用与限制。</p></article>
+          <article><span>03</span><h2>最后行动</h2><p>产品不替你决定，而是帮助你保存一个现实中可以验证的小步骤。</p></article>
         </section>
       </div>
     </PageShell>
@@ -406,22 +466,21 @@ function LandingPage() {
 }
 
 const onboardingSteps = [
-  { id: "name", number: "01", title: "怎么称呼你？", helper: "我们会用这个名字，让体验更自然。" },
-  { id: "date", number: "02", title: "你的出生日期", helper: "日期会进入八字、紫微与西方本命盘计算。" },
-  { id: "time", number: "03", title: "你的出生时间", helper: "当地时间用于四柱、紫微十二宫、西占上升与宫位；不知道时会明确降级。" },
-  { id: "location", number: "04", title: "你出生在哪里？", helper: "搜索城市与国家，再从真实地点结果中确认出生地。" },
-  { id: "rules", number: "05", title: "传统规则输入", helper: "紫微大限顺逆会使用传统男／女输入；若不选择，将省略该层，不推测身份。" },
-  { id: "review", number: "06", title: "确认计算范围", helper: "三个命盘体系、当前时运与规则综合都会在浏览器内计算。" },
+  { id: "focus", number: "01", title: "你现在最想看清什么？", helper: "先从现实问题开始，结果会优先打开与你最相关的入口。" },
+  { id: "birth", number: "02", title: "你的出生资料", helper: "称呼可选；日期必填，时间不知道也可以继续。" },
+  { id: "location", number: "03", title: "你出生在哪里？", helper: "确认城市和历史时区，三套计算才会使用同一时刻。" },
+  { id: "review", number: "04", title: "确认后生成地图", helper: "计算事实、传统解释和规则综合会保持清楚分层。" },
 ];
 
 const defaultOnboardingDraft: OnboardingDraft = {
-  name: demoBirthProfile.displayName,
-  date: demoBirthProfile.birthDate,
-  time: demoBirthProfile.birthTime ?? "12:00",
+  focus: "relationships",
+  name: "",
+  date: "",
+  time: "",
   unknownTime: false,
-  locationQuery: defaultBirthPlace.label,
-  selectedPlace: defaultBirthPlace,
-  gender: demoBirthProfile.traditionalGender,
+  locationQuery: "",
+  selectedPlace: null,
+  gender: "prefer-not-to-say",
   consent: false,
 };
 
@@ -483,15 +542,19 @@ function OnboardingPage() {
   const current = onboardingSteps[step];
 
   useEffect(() => {
-    queueMicrotask(() => setForm(readOnboardingDraft(defaultOnboardingDraft)));
+    const intent = new URLSearchParams(window.location.search).get("intent");
+    const routedFocus = focusOptions.some((item) => item.id === intent) ? intent as ReflectionFocus : null;
+    queueMicrotask(() => {
+      const draft = readOnboardingDraft(defaultOnboardingDraft);
+      setForm(routedFocus ? { ...draft, focus: routedFocus } : draft);
+    });
   }, []);
 
   useEffect(() => { writeOnboardingDraft(form); }, [form]);
 
   const valid = useMemo(() => {
-    if (current.id === "name") return form.name.trim().length > 0;
-    if (current.id === "date") return Boolean(form.date);
-    if (current.id === "time") return form.unknownTime || Boolean(form.time);
+    if (current.id === "focus") return Boolean(form.focus);
+    if (current.id === "birth") return Boolean(form.date) && (form.unknownTime || Boolean(form.time));
     if (current.id === "location") return Boolean(form.selectedPlace);
     if (current.id === "review") return form.consent;
     return true;
@@ -506,7 +569,7 @@ function OnboardingPage() {
       }
       try {
         const profile = {
-          displayName: form.name,
+          displayName: form.name.trim() || "你",
           birthDate: form.date,
           birthTime: form.unknownTime ? null : form.time,
           timeAccuracy: form.unknownTime ? "unknown" as const : "known" as const,
@@ -516,6 +579,7 @@ function OnboardingPage() {
         const bazi = calculateBazi(profile);
         buildCalculatedExperience(bazi, localDateString());
         writeBirthProfile(profile);
+        sessionStorage.setItem("life-map-focus", form.focus);
         sessionStorage.setItem("life-map-complete", "true");
         navigate("/generating");
       } catch {
@@ -530,21 +594,22 @@ function OnboardingPage() {
         <header className="onboarding__header"><Link href="/" className="wordmark"><BrandMark /><span>Life Map</span></Link><span>创建你的地图</span></header>
         <div className="progress-track" aria-label={`第 ${step + 1} 步，共 ${onboardingSteps.length} 步`}><i style={{ width: `${((step + 1) / onboardingSteps.length) * 100}%` }} /></div>
         <section className="onboarding__panel">
-          <div className="step-count"><span>{current.number}</span><small>OF 06</small></div>
+          <div className="step-count"><span>{current.number}</span><small>OF 04</small></div>
           <p className="eyebrow">BIRTH PROFILE · 出生档案</p>
           <h1>{current.title}</h1>
           <p className="step-helper">{current.helper}</p>
           <div className="step-fields">
-            {current.id === "name" && <label className="field"><span>偏好称呼</span><input autoFocus value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="输入你的名字" /></label>}
-            {current.id === "date" && <label className="field"><span>出生日期</span><input type="date" min="1900-01-01" max="2100-12-31" value={form.date} onChange={(event) => setForm({ ...form, date: event.target.value })} /><small>当前引擎支持 1900—2100 年的公历输入。</small></label>}
-            {current.id === "time" && <>
+            {current.id === "focus" && <div className="focus-choice" role="radiogroup" aria-label="当前最想查看的主题">{focusOptions.map((option) => <button key={option.id} type="button" role="radio" aria-checked={form.focus === option.id} className={form.focus === option.id ? "is-selected" : ""} onClick={() => setForm({ ...form, focus: option.id })}><span>{option.label}</span><div><strong>{option.title}</strong><small>{option.description}</small></div><b aria-hidden="true">{form.focus === option.id ? "✓" : "→"}</b></button>)}</div>}
+            {current.id === "birth" && <div className="birth-fields">
+              <label className="field"><span>怎么称呼你？（选填）</span><input autoFocus value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="稍后也可以填写" /></label>
+              <label className="field"><span>出生日期</span><input type="date" min="1900-01-01" max="2100-12-31" value={form.date} onChange={(event) => setForm({ ...form, date: event.target.value })} /><small>当前引擎支持 1900—2100 年的公历输入。</small></label>
               <label className="field"><span>当地时间</span><input type="time" value={form.time} disabled={form.unknownTime} onChange={(event) => setForm({ ...form, time: event.target.value })} /></label>
               <label className="check-field"><input type="checkbox" checked={form.unknownTime} onChange={(event) => setForm({ ...form, unknownTime: event.target.checked })} /><span><strong>我不知道准确时间</strong><small>会省略八字时柱与紫微十二宫；西占只显示当日行星星座，不推算上升与宫位。</small></span></label>
-            </>}
+            </div>}
             {current.id === "location" && <BirthplaceSearch query={form.locationQuery} selectedPlace={form.selectedPlace} onQueryChange={(locationQuery) => setForm((value) => ({ ...value, locationQuery }))} onSelect={(selectedPlace) => setForm((value) => ({ ...value, selectedPlace }))} />}
-            {current.id === "rules" && <fieldset className="choice-field"><legend>传统规则输入（选填）</legend>{[["female", "女性"], ["male", "男性"], ["nonbinary", "非二元"], ["prefer-not-to-say", "不愿说明"]].map(([value, label]) => <label key={value}><input type="radio" name="gender" value={value} checked={form.gender === value} onChange={(event) => setForm({ ...form, gender: event.target.value as OnboardingDraft["gender"] })} /><span>{label}</span></label>)}</fieldset>}
             {current.id === "review" && <div className="review-card">
-              <dl><div><dt>称呼</dt><dd>{form.name}</dd></div><div><dt>出生日期</dt><dd>{form.date}</dd></div><div><dt>出生时间</dt><dd>{form.unknownTime ? "未知（不计算时柱）" : form.time}</dd></div><div><dt>出生地点</dt><dd>{form.selectedPlace?.label ?? "尚未选择"}</dd></div><div><dt>时区</dt><dd>{form.selectedPlace?.timeZone ?? "—"}</dd></div></dl>
+              <dl><div><dt>先看主题</dt><dd>{focusOption(form.focus).label}</dd></div><div><dt>称呼</dt><dd>{form.name.trim() || "稍后填写"}</dd></div><div><dt>出生日期</dt><dd>{form.date}</dd></div><div><dt>出生时间</dt><dd>{form.unknownTime ? "未知（不计算时柱）" : form.time}</dd></div><div><dt>出生地点</dt><dd>{form.selectedPlace?.label ?? "尚未选择"}</dd></div><div><dt>时区</dt><dd>{form.selectedPlace?.timeZone ?? "—"}</dd></div></dl>
+              <details className="advanced-input"><summary>传统规则输入（选填）</summary><p>部分紫微流派使用传统男／女输入决定大限顺逆。若不选择，我们会省略这一层，不推测身份。</p><fieldset className="choice-field"><legend className="sr-only">传统规则输入</legend>{[["female", "女性"], ["male", "男性"], ["nonbinary", "非二元"], ["prefer-not-to-say", "不愿说明"]].map(([value, label]) => <label key={value}><input type="radio" name="gender" value={value} checked={form.gender === value} onChange={(event) => setForm({ ...form, gender: event.target.value as OnboardingDraft["gender"] })} /><span>{label}</span></label>)}</fieldset></details>
               <label className="check-field"><input type="checkbox" checked={form.consent} onChange={(event) => setForm({ ...form, consent: event.target.checked })} /><span><strong>我理解当前的计算范围</strong><small>命盘与时运事实由版本化引擎计算；综合文字来自规则模板，不是实时 AI、科学预测或结果保证。</small></span></label>
             </div>}
           </div>
@@ -590,31 +655,45 @@ function GeneratingPage() {
   );
 }
 
-function ReportOffer({ compact = false }: { compact?: boolean }) {
+function ReportOffer({ compact = false, ready = true }: { compact?: boolean; ready?: boolean }) {
   return (
     <section className={`report-offer ${compact ? "report-offer--compact" : ""}`}>
       <div className="report-offer__folio" aria-hidden="true"><span>10</span><i /><i /><i /></div>
       <div>
-        <p className="eyebrow">PRIVATE PDF · 完整报告</p>
-        <h2>把四套计算事实与综合洞察，整理成一份私人报告</h2>
-        <p>十页阅读体验：八字、紫微、西占、当前时运、可追溯综合洞察与七日练习。出生资料只留在浏览器。</p>
-        <div className="report-offer__meta"><span>10 pages</span><span>本地生成</span><strong>USD $2</strong></div>
-        <Link href="/report" className="button button--primary">预览并购买完整报告 <span aria-hidden="true">→</span></Link>
+        <p className="eyebrow">PRIVATE PDF · 一次性报告</p>
+        <h2>{ready ? "把这次问题与四套计算事实，整理成一份私人记录" : "先完成一次问题，再决定是否需要完整报告"}</h2>
+        <p>{ready ? "十页测试版包含八字、紫微、西占、当前时运、证据综合与七日练习。出生资料只留在浏览器。" : "免费洞察与证据永远可以先看。完成一次决策反思后，报告会围绕你的问题说明它能补充什么。"}</p>
+        <div className="report-offer__meta"><span>10 pages</span><span>本地生成</span>{ready && <strong>BETA · USD $2</strong>}</div>
+        <Link href={ready ? "/report" : "/ask"} className={`button ${ready ? "button--primary" : "button--secondary"}`}>{ready ? "预览完整报告" : "先完成一次问题"} <span aria-hidden="true">→</span></Link>
       </div>
+    </section>
+  );
+}
+
+function ReflectionThreadCard({ reflection }: { reflection: SavedReflection }) {
+  return (
+    <section className="reflection-thread">
+      <div><p className="eyebrow">CONTINUE YOUR THREAD · 继续观察</p><h2>{reflection.question}</h2><p>{reflection.action ? `你保存的下一步：${reflection.action}` : "你已经保存了这个问题，可以继续补充一个现实中可验证的动作。"}</p></div>
+      <div className="reflection-thread__meta"><span>{focusOption(reflection.focus).label}</span>{reflection.reviewDate && <span>复盘 · {reflection.reviewDate}</span>}<Link href="/me#reflection-history">查看记录 →</Link></div>
     </section>
   );
 }
 
 function TodayPage() {
   const { reading, experience, calculationError } = useActiveExperience();
+  const { items: reflections } = useSavedReflections();
+  const preferredFocus = useSessionFocus();
   if (!experience) return <ErrorState route="today" title="今天的地图无法完成计算" message={calculationError ?? "请检查出生资料。"} href="/onboarding" action="检查出生资料" />;
   const today = experience.todayInsight;
-  const featured = products[0];
+  const featured = products.find((product) => product.id === recommendation.productId) ?? products[0];
   const timing = experience.timing;
+  const latestReflection = reflections[0] ?? null;
+  const preferred = focusOption(preferredFocus);
+  const greeting = reading.profile.displayName === "你" ? "你好" : `你好，${reading.profile.displayName}`;
   return (
     <PageShell route="today">
       <div className="page today-page">
-        <header className="today-greeting"><div><span>YOUR INNER WEATHER · 此刻的内在天气</span><h1>你好，{reading.profile.displayName}</h1></div><div className="day-seal" aria-label={`日主 ${reading.dayMaster.stem}，${reading.dayMaster.element}`}><span>{reading.dayMaster.stem}</span><small>{elementEnglish[reading.dayMaster.element]}</small></div></header>
+        <header className="today-greeting"><div><span>YOUR INNER WEATHER · 此刻的内在天气</span><h1>{greeting}</h1></div><div className="day-seal" aria-label={`日主 ${reading.dayMaster.stem}，${reading.dayMaster.element}`}><span>{reading.dayMaster.stem}</span><small>{elementEnglish[reading.dayMaster.element]}</small></div></header>
         <PhaseScopeNotice experience={experience} />
         <section className="today-hero">
           <div className="today-hero__motif" aria-hidden="true"><i /><i /><i /></div>
@@ -622,17 +701,18 @@ function TodayPage() {
           <h2>{today.title}</h2>
           <h3>{today.subtitle}</h3>
           <p>{today.summary}</p>
+          <div className="today-action"><span>今天可以先做</span><strong>{timing.practice}</strong></div>
           <div className="evidence-chips">{today.evidence.map((item) => <EvidenceChip key={item.factId} system={item.system} role={item.role} />)}</div>
           <Link href={`/insights/${today.id}`} className="button button--ink">为什么？查看依据 <span aria-hidden="true">↗</span></Link>
         </section>
-        <ReportOffer />
         <section className="section-block">
-          <SectionHeader eyebrow="REFLECT" title="从一个问题开始" />
+          <SectionHeader eyebrow="REFLECT" title={latestReflection ? "继续，或开始一个新问题" : "从一个现实问题开始"} />
           <div className="quick-grid">
-            <Link href="/ask" className="quick-card"><span className="quick-card__motif quick-card__motif--ask" aria-hidden="true" /><small>ASK MY CHART</small><h3>问命盘</h3><p>从三个体系寻找共同主题</p><b aria-hidden="true">→</b></Link>
+            <Link href={`/ask?focus=${preferredFocus}`} className="quick-card"><span className="quick-card__motif quick-card__motif--ask" aria-hidden="true" /><small>DECISION SESSION</small><h3>梳理{preferred.label}问题</h3><p>{preferred.description}</p><b aria-hidden="true">→</b></Link>
             <Link href="/iching" className="quick-card quick-card--cinnabar"><span className="quick-card__motif quick-card__motif--iching" aria-hidden="true" /><small>I CHING</small><h3>问一卦</h3><p>为此刻的具体问题留出空间</p><b aria-hidden="true">→</b></Link>
           </div>
         </section>
+        {latestReflection && <ReflectionThreadCard reflection={latestReflection} />}
         <section className="section-block"><SectionHeader eyebrow="YOUR PATTERNS" title="生命领域" action="查看全部" href="/life-map" /><div className="domain-grid domain-grid--today">{experience.domains.slice(0, 4).map((domain, index) => <Link href={`/life-map/${domain.id}`} className="domain-card" key={domain.id}><span className="domain-card__index">0{index + 1}</span><small>{domain.nameEn}</small><h3>{domain.nameZh}</h3><p>{domain.pattern}</p><span className={`state state--${domain.state}`}>{domain.state === "active" ? "多源交集" : domain.state === "steady" ? "独立线索" : "保留张力"}</span></Link>)}</div></section>
         <section className="timing-card">
           <div><p className="eyebrow">CURRENT SEASON · 当前阶段</p><h2>{timing.title}</h2><p>{timing.summary}</p><Link href="/timing" className="text-link">展开时间线 <span aria-hidden="true">→</span></Link></div>
@@ -640,10 +720,10 @@ function TodayPage() {
         </section>
         <section className="symbol-section">
           <ElementPresenceGraph reading={reading} compact />
-          <div><p className="eyebrow">RULE-BASED REFLECTION · 规则综合</p><h2>{today.title}</h2><p>左侧是确定性四柱结构；综合主题只引用上方可展开的计算证据，不从五行数量直接推导吉凶。</p><div className="practice"><span>今日练习</span><p>{today.reflectionPrompt}</p></div></div>
+          <div><p className="eyebrow">RULE-BASED REFLECTION · 规则综合</p><h2>{today.title}</h2><p>左侧是确定性四柱结构；综合主题只引用上方可展开的计算证据，不从五行数量直接推导吉凶。</p><div className="practice"><span>继续写一行</span><p>{today.reflectionPrompt}</p></div></div>
         </section>
-        <section className="section-block"><SectionHeader eyebrow="OPTIONAL OBJECT" title={`与「${today.title}」主题并置`} /><article className="recommendation-card"><ProductVisual product={featured} /><div className="recommendation-card__content"><div><span className="pill">SYMBOLIC · OPTIONAL</span><h2>{featured.nameEn}</h2><h3>{featured.nameZh}</h3><p>这件物品只作为当前反思主题的可选提醒；它不改变命盘、时运或现实结果。先完成上面的无购买练习，再决定是否需要任何物件。</p></div><div className="recommendation-card__footer"><span>{featured.price}</span><Link href={`/objects/${featured.slug}`} className="button button--secondary">查看象征含义</Link></div></div></article></section>
-        <section className="recent-questions"><SectionHeader eyebrow="RECENT" title="最近想过的问题" /><Link href="/ask?prompt=我现在适合换工作吗？">我现在适合换工作吗？ <span>→</span></Link><Link href="/ask?prompt=为什么我做一段时间后就想开始新的事情？">为什么我做一段时间后就想开始新的事情？ <span>→</span></Link></section>
+        <ReportOffer compact ready={Boolean(latestReflection)} />
+        {latestReflection?.action && <section className="section-block"><SectionHeader eyebrow="OPTIONAL OBJECT" title="在行动之后，才考虑一个象征提醒" /><article className="recommendation-card"><ProductVisual product={featured} /><div className="recommendation-card__content"><div><span className="pill">SYMBOLIC · OPTIONAL</span><h2>{featured.nameEn}</h2><h3>{featured.nameZh}</h3><p>你已经先保存了一个不需要购买的行动。这件物品只作为可选提醒；它不改变命盘、时运或现实结果。</p></div><div className="recommendation-card__footer"><span>{featured.price}</span><Link href={`/objects/${featured.slug}`} className="button button--secondary">查看象征含义</Link></div></div></article></section>}
       </div>
     </PageShell>
   );
@@ -683,10 +763,14 @@ function LifeMapPage() {
         <PhaseScopeNotice experience={experience} />
         <header className="map-hero"><div><p className="eyebrow">YOUR NATAL BLUEPRINT · 你的底图</p><h1>{identity.title.split(" · ")[0]}<br /><i>×</i> {identity.title.split(" · ")[1] ?? "观察"}</h1><p>{identity.summary}</p><div className="evidence-chips">{identity.evidence.map((item) => <EvidenceChip key={item.factId} system={item.system} role={item.role} />)}</div></div><div className="map-diagram" aria-label="三个计算体系汇聚为 Life Map 的抽象图"><span className="map-ring" /><span className="map-grid" /><span className="map-pillars" /><b>命</b></div></header>
         <div className="map-note"><span>如何阅读</span><p>这些领域不是命运评分，而是理解长期模式的入口。当前活跃表示本期内容的主题强调，不代表好或坏。</p></div>
-        <BaziChartCard reading={reading} explanation={chartExplanations.bazi} id="bazi-chart" visual />
-        <ZiweiChartCard reading={experience.ziwei} explanation={chartExplanations.ziwei} />
-        <WesternChartCard reading={experience.western} explanation={chartExplanations.astrology} />
-        <section className="section-block"><SectionHeader eyebrow="EIGHT DOMAINS" title="八个生命领域" /><div className="domain-grid domain-grid--all">{experience.domains.map((domain, index) => <Link href={`/life-map/${domain.id}`} className="domain-card domain-card--wide" key={domain.id}><span className="domain-card__index">{String(index + 1).padStart(2, "0")}</span><div><small>{domain.nameEn}</small><h3>{domain.nameZh}</h3></div><p>{domain.pattern}</p><span className={`state state--${domain.state}`}>{domain.state === "active" ? "多源交集" : domain.state === "steady" ? "独立线索" : "保留张力"}</span><b aria-hidden="true">↗</b></Link>)}</div></section>
+        <section className="section-block"><SectionHeader eyebrow="EIGHT DOMAINS" title="先从生活领域进入" /><div className="domain-grid domain-grid--all">{experience.domains.map((domain, index) => <Link href={`/life-map/${domain.id}`} className="domain-card domain-card--wide" key={domain.id}><span className="domain-card__index">{String(index + 1).padStart(2, "0")}</span><div><small>{domain.nameEn}</small><h3>{domain.nameZh}</h3></div><p>{domain.pattern}</p><span className={`state state--${domain.state}`}>{domain.state === "active" ? "多源交集" : domain.state === "steady" ? "独立线索" : "保留张力"}</span><b aria-hidden="true">↗</b></Link>)}</div></section>
+        <section className="chart-lab">
+          <SectionHeader eyebrow="PROFESSIONAL VIEW · 专业视图" title="需要时，再展开完整命盘" />
+          <p className="chart-lab__intro">生命领域负责回答“这和我有什么关系”；完整盘负责展示“底层事实是什么”。所有计算细节保持免费可查。</p>
+          <details className="chart-system-disclosure"><summary><span>01</span><div><small>BAZI · 八字</small><strong>四柱与表层五行</strong></div><b>展开命盘</b></summary><BaziChartCard reading={reading} explanation={chartExplanations.bazi} id="bazi-chart" visual /></details>
+          <details className="chart-system-disclosure"><summary><span>02</span><div><small>ZI WEI DOU SHU · 紫微斗数</small><strong>十二宫与主星</strong></div><b>展开命盘</b></summary><ZiweiChartCard reading={experience.ziwei} explanation={chartExplanations.ziwei} /></details>
+          <details className="chart-system-disclosure"><summary><span>03</span><div><small>WESTERN NATAL · 西方占星</small><strong>行星、宫位与相位</strong></div><b>展开命盘</b></summary><WesternChartCard reading={experience.western} explanation={chartExplanations.astrology} /></details>
+        </section>
       </div>
     </PageShell>
   );
@@ -713,36 +797,87 @@ function DomainPage({ id }: { id?: string }) {
 
 function AskPage() {
   const { experience, calculationError } = useActiveExperience();
-  const [input, setInput] = useState("");
+  const [focus, setFocus] = useState<ReflectionFocus>("relationships");
+  const [question, setQuestion] = useState("");
+  const [options, setOptions] = useState("");
+  const [concern, setConcern] = useState("");
+  const [deadline, setDeadline] = useState("");
   const [answer, setAnswer] = useState<AskResponse | null>(null);
   useEffect(() => {
     if (!experience) return;
-    const prompt = new URLSearchParams(window.location.search).get("prompt");
-    if (prompt) queueMicrotask(() => { setInput(prompt); setAnswer(routeCalculatedAsk(prompt, experience)); });
+    const params = new URLSearchParams(window.location.search);
+    const prompt = params.get("prompt");
+    const routedFocus = params.get("focus");
+    queueMicrotask(() => {
+      if (focusOptions.some((item) => item.id === routedFocus)) setFocus(routedFocus as ReflectionFocus);
+      if (prompt) setQuestion(prompt);
+    });
   }, [experience]);
   if (!experience) return <ErrorState route="ask" title="问命盘需要先完成计算" message={calculationError ?? "请检查出生资料。"} href="/onboarding" action="检查出生资料" />;
-  const submit = (event: FormEvent) => { event.preventDefault(); if (input.trim()) setAnswer(routeCalculatedAsk(input, experience)); };
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    if (!question.trim()) return;
+    const routedQuestion = `${focusOption(focus).label}：${question}`;
+    setAnswer(routeCalculatedAsk(routedQuestion, experience, focusDomains[focus]));
+  };
+  const reset = () => {
+    setAnswer(null);
+    setQuestion("");
+    setOptions("");
+    setConcern("");
+    setDeadline("");
+  };
   return (
     <PageShell route="ask">
       <div className={`page ask-page ${answer ? "ask-page--answered" : ""}`}>
         {!answer ? <>
-          <header className="ask-hero"><div className="ask-orbit" aria-hidden="true"><span>问</span></div><p className="eyebrow">ASK MY CHART · 问命盘</p><h1>你最近在想什么？</h1><p>我会从你的真实计算事实中寻找共识、张力和不同角度，并让每个回答都能展开查看依据。</p><span className="fixture-label">CALCULATED · 规则综合，不调用实时 AI</span></header>
-          <section className="suggestions"><p className="eyebrow">SUGGESTED QUESTIONS</p>{askResponses.slice(0, 4).map((response, index) => <button key={response.id} onClick={() => { setInput(response.suggestedPrompt); setAnswer(routeCalculatedAsk(response.suggestedPrompt, experience)); }}><span>0{index + 1}</span>{response.suggestedPrompt}<b>→</b></button>)}</section>
-        </> : <AskAnswer answer={answer} question={input} experience={experience} onReset={() => { setAnswer(null); setInput(""); }} />}
-        <form className="chat-composer" onSubmit={submit}><label htmlFor="chart-question" className="sr-only">输入你想问命盘的问题</label><textarea id="chart-question" value={input} onChange={(event) => setInput(event.target.value)} placeholder="写下一个具体的问题…" rows={1} /><button type="submit" aria-label="发送问题" disabled={!input.trim()}>↑</button><small>基于已计算事实的规则回答 · 不替代专业建议</small></form>
+          <header className="ask-hero"><div className="ask-orbit" aria-hidden="true"><span>问</span></div><p className="eyebrow">DECISION SESSION · 决策反思</p><h1>先把问题<br />说具体一点</h1><p>Life Map 不替你选择。它会把现实问题与已计算事实并置，指出共识、张力和一个可以验证的小步骤。</p><span className="fixture-label">CALCULATED · 规则综合，不调用实时 AI</span></header>
+          <form className="decision-form" onSubmit={submit}>
+            <fieldset className="decision-focus"><legend>这次主要关于</legend>{focusOptions.map((option) => <label key={option.id} className={focus === option.id ? "is-selected" : ""}><input type="radio" name="focus" value={option.id} checked={focus === option.id} onChange={() => setFocus(option.id)} /><span>{option.label}</span></label>)}</fieldset>
+            <label className="field field--textarea"><span>你正在面对什么问题？</span><textarea id="chart-question" value={question} onChange={(event) => setQuestion(event.target.value)} placeholder="例如：我想继续这段关系，但不知道该如何说清边界。" rows={3} /></label>
+            <div className="decision-form__grid">
+              <label className="field"><span>你正在比较哪些选择？（选填）</span><input value={options} onChange={(event) => setOptions(event.target.value)} placeholder="留下 / 离开 / 先谈一次" /></label>
+              <label className="field"><span>什么时候需要决定？（选填）</span><input type="date" value={deadline} onChange={(event) => setDeadline(event.target.value)} /></label>
+            </div>
+            <label className="field"><span>你最担心什么？（选填）</span><input value={concern} onChange={(event) => setConcern(event.target.value)} placeholder="失去关系、做错选择、再次重复旧模式…" /></label>
+            <div className="decision-form__footer"><p>输入越具体，规则回答越容易连接到相关领域。不会把问题内容发送到外部服务。</p><button className="button button--primary" type="submit" disabled={!question.trim()}>生成我的决策地图 <span aria-hidden="true">→</span></button></div>
+          </form>
+          <section className="suggestions"><p className="eyebrow">TRY A STARTER</p>{focusOptions.map((option, index) => <button key={option.id} type="button" onClick={() => { setFocus(option.id); setQuestion(option.prompt); }}><span>0{index + 1}</span>{option.prompt}<b>填入</b></button>)}</section>
+        </> : <AskAnswer answer={answer} question={question} options={options} concern={concern} deadline={deadline} focus={focus} experience={experience} onReset={reset} />}
       </div>
     </PageShell>
   );
 }
 
-function AskAnswer({ answer, question, experience, onReset }: { answer: AskResponse; question: string; experience: CalculatedExperience; onReset: () => void }) {
+function AskAnswer({ answer, question, options, concern, deadline, focus, experience, onReset }: { answer: AskResponse; question: string; options: string; concern: string; deadline: string; focus: ReflectionFocus; experience: CalculatedExperience; onReset: () => void }) {
+  const [action, setAction] = useState("");
+  const [reviewDate, setReviewDate] = useState(() => reviewDateFromNow(7));
+  const [saved, setSaved] = useState(false);
+  const save = () => {
+    if (!action.trim()) return;
+    saveReflection({
+      id: `reflection-${Date.now()}`,
+      focus,
+      domain: focusDomains[focus],
+      question: question.trim(),
+      options: options.trim(),
+      concern: concern.trim(),
+      deadline,
+      action: action.trim(),
+      reviewDate,
+      createdAt: new Date().toISOString(),
+    });
+    setSaved(true);
+  };
   return (
     <article className="answer">
       <header><button className="text-button" onClick={onReset}>← 新问题</button><p className="eyebrow">YOUR QUESTION</p><blockquote>{question}</blockquote><span className="kind-label">{answer.kind === "consensus" ? "多体系共识" : answer.kind === "tension" ? "有意义的张力" : "独立线索"}</span><h1>{answer.title}</h1><p>{answer.directAnswer}</p></header>
+      {(options || concern || deadline) && <section className="decision-context"><p className="eyebrow">YOUR REAL-WORLD CONTEXT · 现实条件</p><dl>{options && <div><dt>正在比较</dt><dd>{options}</dd></div>}{concern && <div><dt>最担心</dt><dd>{concern}</dd></div>}{deadline && <div><dt>决定期限</dt><dd>{deadline}</dd></div>}</dl><p>这些内容帮助你保存问题背景，但不会被当成命盘事实或证明某个结果。</p></section>}
       {answer.sections.map((section, index) => <section className="answer-section" key={section.heading}><span>0{index + 1}</span><div><h2>{section.heading}</h2><p>{section.body}</p><EvidenceList evidence={section.evidence} experience={experience} /></div></section>)}
       <section className="answer-reflection"><p className="eyebrow">A QUESTION TO KEEP</p><h2>{answer.reflectionQuestion}</h2></section>
+      <section className="action-plan"><p className="eyebrow">ONE REVERSIBLE STEP · 一个可撤回的小步骤</p><h2>你准备先验证什么？</h2><p>先保存一个不需要购买、可以在现实中观察结果的动作。Life Map 不替你做决定。</p><label className="field"><span>我的下一步</span><input value={action} onChange={(event) => { setAction(event.target.value); setSaved(false); }} placeholder="例如：约一个不被打断的 20 分钟，把边界说清楚。" /></label><label className="field"><span>什么时候回来复盘？</span><input type="date" value={reviewDate} onChange={(event) => { setReviewDate(event.target.value); setSaved(false); }} /></label><button className="button button--primary" type="button" disabled={!action.trim()} onClick={save}>{saved ? "已保存到本次会话" : "保存行动与复盘日期"}</button>{saved && <p className="save-confirmation" role="status">已保存。你可以在“我的”中查看，并从 Today 继续这条线索。</p>}</section>
       {answer.relatedDomain && <Link href={`/life-map/${answer.relatedDomain}`} className="button button--secondary">查看相关生命领域 <span>↗</span></Link>}
-      <p className="disclosure">{answer.disclaimer}</p>
+      <p className="disclosure">{answer.disclaimer} 保存内容只保留在当前浏览器会话中。</p>
     </article>
   );
 }
@@ -768,13 +903,16 @@ function IChingPage() {
 
 function TimingPage() {
   const { experience, calculationError } = useActiveExperience();
+  const { items: reflections } = useSavedReflections();
   if (!experience) return <ErrorState route="timing" title="当前时运无法完成计算" message={calculationError ?? "请检查出生资料。"} href="/onboarding" action="检查出生资料" />;
   const timing = experience.timing;
+  const datedReflection = reflections.find((item) => item.deadline || item.reviewDate);
   return (
     <PageShell route="timing">
       <div className="page timing-page">
         <header className="page-heading"><p className="eyebrow">YOUR CURRENT SEASON · 当前时运</p><h1>{timing.title}</h1><p>{timing.summary}</p></header>
         <section className="timeline-large"><div className="timeline-years"><span>月初</span><span>现在</span><span>下月</span></div><div className="timeline-track" style={{ "--timeline-position": `${timing.nowPosition * 100}%` } as React.CSSProperties}><i style={{ left: `${timing.nowPosition * 100}%` }}><b>NOW</b></i></div><div className="timeline-periods"><article><small>{timing.start}</small><h3>本月计算起点</h3><p>以当前公历月为边界保存一张可复算快照。</p></article><article className="is-current"><small>{timing.start}—{timing.end}</small><h3>{timing.title}</h3><p>{timing.summary}</p></article><article><small>{timing.nextTransition.date}</small><h3>{timing.nextTransition.title}</h3><p>{timing.nextTransition.summary}</p></article></div></section>
+        {datedReflection && <section className="decision-date-card"><p className="eyebrow">YOUR REAL-WORLD DATE · 你的现实时间</p><h2>{datedReflection.question}</h2><p>{datedReflection.deadline ? `你计划在 ${datedReflection.deadline} 前做决定。` : "你还没有设置决定期限。"} {datedReflection.reviewDate ? `复盘日期是 ${datedReflection.reviewDate}。` : ""}</p><small>现实日期来自你保存的问题，不是命盘预测或“吉日”。</small></section>}
         <section className="section-block"><SectionHeader eyebrow="DOMAIN ACTIVATION · 已计算" title="哪些主题留下较多线索" /><div className="signal-list">{timing.signals.map((signal, index) => <article key={signal.id}><div><span>{signal.label}</span><small>{signal.strength === "very-active" ? "多源线索" : signal.strength === "active" ? "可见线索" : "背景线索"}</small></div><i><b style={{ "--signal-width": `${signal.internalStrength * 100}%`, "--signal-delay": `${index * 90}ms` } as React.CSSProperties} /></i><p>{signal.summary}</p></article>)}</div><p className="inline-notice">{timing.disclaimer}</p></section>
         <section className="reading-section"><SectionHeader eyebrow={`AS OF ${timing.asOf}`} title="时运依据来自哪里" /><EvidenceList evidence={timing.evidence} experience={experience} /></section>
         <section className="reflection-card"><span aria-hidden="true">时</span><div><p className="eyebrow">THIS PERIOD&apos;S PRACTICE</p><h2>{experience.todayInsight.reflectionPrompt}</h2><Link href={`/ask?prompt=${encodeURIComponent("这个阶段我最值得留意什么？")}`} className="button button--primary">围绕当前阶段提问</Link></div></section>
@@ -791,6 +929,7 @@ function ReportPage() {
   const storefrontConfigured = Boolean(process.env.NEXT_PUBLIC_SHOPIFY_STOREFRONT_TOKEN?.trim());
 
   if (!experience || !report) return <ErrorState route="report" title="完整报告无法生成" message={calculationError ?? "请检查出生资料。"} href="/onboarding" action="检查出生资料" />;
+  const previewPages = report.pages.filter((page) => [1, 7, 9].includes(page.number));
 
   const beginCheckout = async () => {
     setCheckoutState("loading");
@@ -810,12 +949,12 @@ function ReportPage() {
       <div className="page report-page">
         <header className="report-intro">
           <div>
-            <p className="eyebrow">YOUR PRIVATE EDITION · 私人版本</p>
+            <p className="eyebrow">BETA PRIVATE EDITION · 测试版私人报告</p>
             <h1>{report.title}</h1>
-            <p>报告已在当前浏览器内根据八字、紫微、西占与当前时运的确定性事实生成。Shopify 只接收商品、数量与价格，不接收出生资料或命盘内容。</p>
+            <p>先预览三个完整章节，再决定是否购买十页测试版。报告在当前浏览器内根据八字、紫微、西占与当前时运生成；Shopify 不接收出生资料或命盘内容。</p>
             <div className="report-intro__actions">
               <button className="button button--primary" type="button" onClick={beginCheckout} disabled={checkoutState === "loading"}>
-                {checkoutState === "loading" ? "正在连接 Shopify…" : "购买正式 PDF · USD $2"}
+                {checkoutState === "loading" ? "正在连接 Shopify…" : "购买测试版完整 PDF · USD $2"}
               </button>
               <button className="button button--secondary" type="button" onClick={() => window.print()}>保存本地预览</button>
               <a className="button button--tertiary" href="/downloads/life-map-full-daily-report-sample.pdf" download>下载演示 PDF</a>
@@ -825,7 +964,7 @@ function ReportPage() {
             {checkoutState === "error" && <p className="inline-notice" role="alert">{checkoutMessage}</p>}
           </div>
           <aside className="report-purchase-card" aria-label="报告商品摘要">
-            <span>FULL REPORT</span>
+            <span>BETA FULL REPORT</span>
             <strong>$2</strong>
             <small>USD · DIGITAL PRODUCT</small>
             <dl><div><dt>页数</dt><dd>{report.pages.length}</dd></div><div><dt>引擎</dt><dd>4 versioned</dd></div><div><dt>隐私</dt><dd>Browser only</dd></div></dl>
@@ -835,8 +974,9 @@ function ReportPage() {
         <div className="report-boundary"><span>FACT</span><p>命盘事实来自版本化引擎</p><span>REFLECTION</span><p>传统主题是可质疑的观察角度</p><span>PRACTICE</span><p>练习不需要购买任何物品</p></div>
 
         <section className="report-preview" aria-label="完整报告预览">
-          <div className="report-preview__heading"><p className="eyebrow">MULTI-PAGE PREVIEW</p><h2>十页跨体系报告已经准备好</h2><p>购买的是这份正式数字版报告；当前页面同时作为隐私优先的本地生成预览。</p></div>
-          {report.pages.map((page) => (
+          <div className="report-preview__heading"><p className="eyebrow">THREE-CHAPTER PREVIEW</p><h2>先读三个完整章节</h2><p>证据与主要洞察保持免费可查；购买的是更适合保存、打印和连续实践的十页数字版。</p></div>
+          <ol className="report-toc" aria-label="正式报告目录">{report.pages.map((page) => <li key={page.id} className={previewPages.some((item) => item.id === page.id) ? "is-preview" : ""}><span>{String(page.number).padStart(2, "0")}</span><div><strong>{page.title}</strong><small>{previewPages.some((item) => item.id === page.id) ? "本页完整预览" : "正式 PDF 包含"}</small></div></li>)}</ol>
+          {previewPages.map((page) => (
             <article className={`report-sheet report-sheet--${page.id}`} key={page.id}>
               <header>
                 <span>{page.eyebrow}</span>
@@ -850,7 +990,7 @@ function ReportPage() {
             </article>
           ))}
         </section>
-        <section className="report-final-cta"><p className="eyebrow">READY WHEN YOU ARE</p><h2>保留一份属于你的私人记录</h2><p>{report.disclaimer}</p><button className="button button--primary" type="button" onClick={beginCheckout} disabled={checkoutState === "loading"}>购买正式 PDF · USD $2</button></section>
+        <section className="report-final-cta"><p className="eyebrow">BETA · ONE-TIME PURCHASE</p><h2>保留一份属于你的私人记录</h2><p>{report.disclaimer} 当前 USD $2 是支付与交付流程的测试价格，不代表未来正式定价。</p><button className="button button--primary" type="button" onClick={beginCheckout} disabled={checkoutState === "loading"}>购买测试版完整 PDF · USD $2</button></section>
       </div>
     </PageShell>
   );
@@ -878,9 +1018,11 @@ function ProductPage({ id }: { id?: string }) {
 
 function MePage() {
   const { reading, experience, calculationError } = useActiveExperience();
+  const { items: reflections, setItems: setReflections } = useSavedReflections();
   if (!experience) return <ErrorState route="me" title="出生档案无法完成计算" message={calculationError ?? "请检查出生资料。"} href="/onboarding" action="检查出生资料" />;
   const clearProfile = () => {
     clearBirthProfile();
+    clearReflections();
     navigate("/onboarding");
   };
   return (
@@ -888,7 +1030,8 @@ function MePage() {
       <div className="page me-page">
         <header className="profile-hero"><div className="profile-monogram">{reading.profile.displayName.slice(0, 1).toUpperCase()}</div><div><p className="eyebrow">YOUR PRIVATE SPACE · 你的内在空间</p><h1>{reading.profile.displayName}</h1><p>八字 · 紫微 · 西占 · 时运均使用本地计算</p></div></header>
         <section className="profile-card"><SectionHeader eyebrow="BIRTH PROFILE" title="出生信息" /><dl><div><dt>出生日期</dt><dd>{reading.profile.birthDate}</dd></div><div><dt>出生时间</dt><dd>{reading.profile.birthTime ?? "未知"}</dd></div><div><dt>出生地点</dt><dd>{reading.place.label}</dd></div><div><dt>时区</dt><dd>{reading.place.timeZone}</dd></div><div><dt>状态</dt><dd><span className="calculation-label">三体系计算完成</span></dd></div></dl><Link href="/onboarding" className="text-link">重新输入资料 →</Link></section>
-        <BaziChartCard reading={reading} />
+        <section className="reflection-history" id="reflection-history"><SectionHeader eyebrow="YOUR THREADS" title="问题与行动" action={reflections.length ? `${reflections.length} 条记录` : undefined} />{reflections.length ? <div>{reflections.map((reflection) => <article key={reflection.id}><span>{focusOption(reflection.focus).label}</span><div><h3>{reflection.question}</h3><p>{reflection.action}</p><small>{reflection.reviewDate ? `计划复盘 ${reflection.reviewDate}` : "未设置复盘日期"}</small></div><button type="button" aria-label={`删除问题：${reflection.question}`} onClick={() => setReflections(removeReflection(reflection.id))}>删除</button></article>)}</div> : <div className="empty-thread"><p>还没有保存问题。完成一次决策反思后，你的行动和复盘日期会出现在这里。</p><Link href="/ask" className="button button--secondary">开始一个问题</Link></div>}<p className="reflection-history__privacy">当前阶段只保存在本次浏览器会话中。账号同步、跨设备记忆与提醒尚未启用。</p></section>
+        <details className="profile-chart"><summary>查看我的四柱计算事实</summary><BaziChartCard reading={reading} /></details>
         <section className="menu-list"><Link href="/report"><span>完整每日报告</span><small>生成十页跨体系私人 PDF · USD $2</small><b>→</b></Link><Link href="/objects"><span>象征物收藏</span><small>查看所有演示物品</small><b>→</b></Link><button disabled><span>关系档案</span><small>后续阶段开放</small><b>即将开放</b></button><button disabled><span>通知与每日提醒</span><small>后续阶段开放</small><b>即将开放</b></button></section>
         <section className="trust-card"><p className="eyebrow">TRUST & PRIVACY</p><h2>你的信息，只留在这次浏览会话</h2><p>出生资料只保存在当前浏览器会话中，不会上传、写入账户或发送分析事件。关闭会话后浏览器会清除它。</p><ul><li>八字、紫微和西占由版本锁定的本地引擎计算</li><li>时运使用 {experience.calculatedFor} 的干支、紫微运限与行星角距快照</li><li>综合解释由规则生成，不调用实时 AI 或追踪</li></ul><button className="text-button text-button--danger" onClick={clearProfile}>清除本次出生资料</button></section>
       </div>

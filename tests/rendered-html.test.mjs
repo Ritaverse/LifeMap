@@ -18,8 +18,8 @@ test("server-renders the Life Map landing experience", async () => {
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
   const html = await response.text();
   assert.match(html, /<title>Life Map · 人生地图<\/title>/i);
-  assert.match(html, /看见属于你/);
-  assert.match(html, /生成我的命盘/);
+  assert.match(html, /把此刻的问题/);
+  assert.match(html, /免费生成三体系快照/);
   assert.match(html, /不是科学预测/);
   assert.doesNotMatch(html, /codex-preview|react-loading-skeleton/i);
 });
@@ -32,17 +32,17 @@ test("server-renders directly addressable product routes", async () => {
   }
 });
 
-test("server-renders the private multi-page report and $2 Shopify handoff", async () => {
+test("server-renders the private report preview and $2 beta Shopify handoff", async () => {
   const response = await render("/report");
   assert.equal(response.status, 200);
   const html = await response.text();
   assert.match(html, /完整跨体系每日反思报告/);
-  assert.match(html, /购买正式 PDF · USD \$2/);
-  assert.match(html, /十页跨体系报告已经准备好/);
+  assert.match(html, /购买测试版完整 PDF · USD \$2/);
+  assert.match(html, /先读三个完整章节/);
   assert.match(html, /紫微十二宫/);
   assert.match(html, /西方本命盘/);
-  assert.match(html, /综合洞察不是实时 AI/);
-  assert.match(html, /Shopify 只接收商品、数量与价格/);
+  assert.match(html, /今日综合洞察/);
+  assert.match(html, /Shopify 不接收出生资料或命盘内容/);
   assert.match(html, /不是科学预测/);
   assert.doesNotMatch(html, /storefront-access-token/i);
 });
@@ -66,10 +66,20 @@ test("server-renders the interactive BaZi chart from calculated facts", async ()
   assert.match(html, /图上事实/);
   assert.match(html, /传统观察/);
   assert.match(html, /阅读边界/);
-  assert.match(html, /正式 PDF 为 USD \$2/);
-  assert.ok((html.match(/href="\/report"/g) ?? []).length >= 3);
-  assert.ok((html.match(/详细解释/g) ?? []).length >= 3);
+  assert.match(html, /所有计算细节保持免费可查/);
+  assert.match(html, /完整盘负责展示/);
+  assert.doesNotMatch(html, /正式 PDF 为 USD \$2/);
   assert.match(html, /<svg\b/i);
+});
+
+test("server-renders the structured decision session", async () => {
+  const response = await render("/ask");
+  assert.equal(response.status, 200);
+  const html = await response.text();
+  assert.match(html, /DECISION SESSION/);
+  assert.match(html, /你正在面对什么问题/);
+  assert.match(html, /你正在比较哪些选择/);
+  assert.match(html, /生成我的决策地图/);
 });
 
 test("server-renders original product imagery with useful alternative text", async () => {
