@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { demoBaziReading } from "../app/lib/bazi.ts";
-import { buildCalculatedExperience, resolveCalculatedEvidence, routeCalculatedAsk } from "../app/lib/experience.ts";
+import { calculateBazi, demoBaziReading, demoBirthProfile } from "../app/lib/bazi.ts";
+import { buildCalculatedExperience, getChartExplanationPreview, resolveCalculatedEvidence, routeCalculatedAsk } from "../app/lib/experience.ts";
 
 test("calculated experience derives synthesis only from calculated facts", () => {
   const first = buildCalculatedExperience(demoBaziReading, "2026-09-20");
@@ -38,3 +38,23 @@ test("timing snapshot identifies its date and calculated source facts", () => {
   assert.ok(experience.timing.disclaimer.includes("不是好运、坏运"));
 });
 
+test("chart explanation previews remain linked to calculated natal facts", () => {
+  const experience = buildCalculatedExperience(demoBaziReading, "2026-09-20");
+  for (const system of ["bazi", "ziwei", "astrology"]) {
+    const preview = getChartExplanationPreview(experience, system);
+    assert.equal(preview.lines.length, 3);
+    assert.ok(preview.lines.every((line) => line.text.endsWith("。")));
+    assert.ok(preview.evidenceFactId);
+    assert.ok(experience.facts.some((fact) => fact.id === preview.evidenceFactId && fact.system === system));
+  }
+});
+
+test("chart explanation previews preserve unknown-time limits", () => {
+  const reading = calculateBazi({ ...demoBirthProfile, birthTime: null, timeAccuracy: "unknown" });
+  const experience = buildCalculatedExperience(reading, "2026-09-20");
+  const ziwei = getChartExplanationPreview(experience, "ziwei");
+  const western = getChartExplanationPreview(experience, "astrology");
+  assert.equal(ziwei.evidenceFactId, null);
+  assert.match(ziwei.lines.map((line) => line.text).join(" "), /出生时间未知|不会用其他出生时间/);
+  assert.match(western.lines[2].text, /未使用上升点、天顶或宫位/);
+});

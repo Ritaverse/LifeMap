@@ -60,6 +60,15 @@ test("server-renders the interactive BaZi chart from calculated facts", async ()
   assert.match(html, /表层五行数量：/);
   assert.match(html, /ZI WEI DOU SHU · 紫微斗数/);
   assert.match(html, /WESTERN NATAL · 西方占星/);
+  assert.match(html, /data-chart-system="bazi"/);
+  assert.match(html, /data-chart-system="ziwei"/);
+  assert.match(html, /data-chart-system="astrology"/);
+  assert.match(html, /图上事实/);
+  assert.match(html, /传统观察/);
+  assert.match(html, /阅读边界/);
+  assert.match(html, /正式 PDF 为 USD \$2/);
+  assert.ok((html.match(/href="\/report"/g) ?? []).length >= 3);
+  assert.ok((html.match(/详细解释/g) ?? []).length >= 3);
   assert.match(html, /<svg\b/i);
 });
 

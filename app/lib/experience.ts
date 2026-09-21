@@ -44,6 +44,16 @@ export interface CalculatedExperience {
   limitations: string[];
 }
 
+export interface ChartExplanationPreview {
+  system: SystemId;
+  evidenceFactId: string | null;
+  lines: [
+    { label: string; text: string },
+    { label: string; text: string },
+    { label: string; text: string },
+  ];
+}
+
 const domainOrder: DomainId[] = ["identity", "career", "wealth", "love", "family", "relationships", "creativity", "inner-life"];
 
 const domainLabels: Record<DomainId, { zh: string; en: string; palace: string; planet: string }> = {
@@ -424,6 +434,38 @@ export function resolveCalculatedEvidence(experience: CalculatedExperience, evid
     if (fact.system !== reference.system) throw new Error(`Calculated evidence system mismatch: ${reference.factId}`);
     return { ...reference, fact };
   });
+}
+
+function completeSentence(value: string) {
+  const text = value.trim();
+  return /[。！？.!?]$/.test(text) ? text : `${text}。`;
+}
+
+export function getChartExplanationPreview(experience: CalculatedExperience, system: SystemId): ChartExplanationPreview {
+  const fact = experience.facts.find((item) => item.system === system && item.scope === "natal" && item.domain === "identity");
+  if (!fact) {
+    if (system === "ziwei" && experience.ziwei.status === "unavailable") {
+      return {
+        system,
+        evidenceFactId: null,
+        lines: [
+          { label: "图上事实", text: completeSentence(experience.ziwei.caveats[0] ?? "出生时间未知，紫微十二宫不进行推算") },
+          { label: "阅读方式", text: "没有可复算的宫位结构时，本页保留空白，不会用其他出生时间补造命宫或身宫。" },
+          { label: "阅读边界", text: "完整报告也会明确省略紫微十二宫，只使用当前可复算的八字、西占与时运事实。" },
+        ],
+      };
+    }
+    throw new Error(`Missing ${system} identity fact for chart explanation`);
+  }
+  return {
+    system,
+    evidenceFactId: fact.id,
+    lines: [
+      { label: "图上事实", text: completeSentence(fact.rawLabel) },
+      { label: "传统观察", text: completeSentence(fact.traditionalInterpretation) },
+      { label: "阅读边界", text: completeSentence(fact.limitations ?? "这条事实只作为反思入口，不单独形成结果判断") },
+    ],
+  };
 }
 
 export function routeCalculatedAsk(input: string, experience: CalculatedExperience): AskResponse {

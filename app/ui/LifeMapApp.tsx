@@ -6,8 +6,8 @@ import type { AnchorHTMLAttributes, FormEvent, ReactNode } from "react";
 import { askResponses, iching, products, recommendation } from "../lib/data";
 import { calculateBazi, defaultBirthPlace, demoBaziReading, demoBirthProfile } from "../lib/bazi";
 import type { BaziPillar, BaziReading, BirthPlace, FiveElement, PillarKind } from "../lib/bazi";
-import { buildCalculatedExperience, localDateString, resolveCalculatedEvidence, routeCalculatedAsk } from "../lib/experience";
-import type { CalculatedExperience } from "../lib/experience";
+import { buildCalculatedExperience, getChartExplanationPreview, localDateString, resolveCalculatedEvidence, routeCalculatedAsk } from "../lib/experience";
+import type { CalculatedExperience, ChartExplanationPreview } from "../lib/experience";
 import { searchBirthPlaces } from "../lib/place-search";
 import { clearBirthProfile, readBirthProfile, readOnboardingDraft, writeBirthProfile, writeOnboardingDraft } from "../lib/profile-storage";
 import type { OnboardingDraft } from "../lib/profile-storage";
@@ -220,7 +220,27 @@ function BaziChartDrawing({ reading }: { reading: BaziReading }) {
   );
 }
 
-function BaziChartCard({ reading, id, visual = false }: { reading: BaziReading; id?: string; visual?: boolean }) {
+function ChartExplanation({ preview }: { preview: ChartExplanationPreview }) {
+  const label = systemLabels[preview.system].full;
+  const headingId = `chart-explanation-${preview.system}`;
+  return (
+    <aside className="chart-explanation" data-chart-system={preview.system} data-evidence-id={preview.evidenceFactId ?? undefined} aria-labelledby={headingId}>
+      <div>
+        <p className="eyebrow">CHART NOTE · 命盘简读</p>
+        <h3 id={headingId}>先读这三点</h3>
+        <div className="chart-explanation__copy">
+          {preview.lines.map((line) => <p key={line.label}><strong>{line.label}</strong>{line.text}</p>)}
+        </div>
+      </div>
+      <footer className="chart-explanation__footer">
+        <span>前往完整报告预览 · 正式 PDF 为 USD $2</span>
+        <Link href="/report" className="text-link" aria-label={`查看${label}详细解释，前往完整报告预览与购买页面`}>详细解释 <span aria-hidden="true">→</span></Link>
+      </footer>
+    </aside>
+  );
+}
+
+function BaziChartCard({ reading, explanation, id, visual = false }: { reading: BaziReading; explanation?: ChartExplanationPreview; id?: string; visual?: boolean }) {
   const pillars = [reading.pillars.year, reading.pillars.month, reading.pillars.day, reading.pillars.time];
   return (
     <section className="bazi-chart" id={id}>
@@ -248,6 +268,7 @@ function BaziChartCard({ reading, id, visual = false }: { reading: BaziReading; 
         <div><span>农历日期</span><strong>{reading.lunarDate}</strong><small>{reading.place.timeZone}</small></div>
       </div>
       <ElementPresenceGraph reading={reading} compact={!visual} />
+      {explanation && <ChartExplanation preview={explanation} />}
       <details className="calculation-details">
         <summary>查看计算规则与限制</summary>
         <dl><div><dt>年界</dt><dd>立春</dd></div><div><dt>月界</dt><dd>节气中的「节」</dd></div><div><dt>日界</dt><dd>当地民用时间 00:00</dd></div><div><dt>真太阳时</dt><dd>本阶段未校正</dd></div></dl>
@@ -286,9 +307,9 @@ function EvidenceList({ evidence, experience }: { evidence: EvidenceRef[]; exper
 
 const ziweiGridAreas = ["4 / 1", "4 / 2", "4 / 3", "4 / 4", "3 / 4", "2 / 4", "1 / 4", "1 / 3", "1 / 2", "1 / 1", "2 / 1", "3 / 1"];
 
-function ZiweiChartCard({ reading }: { reading: ZiweiReading }) {
+function ZiweiChartCard({ reading, explanation }: { reading: ZiweiReading; explanation: ChartExplanationPreview }) {
   if (reading.status === "unavailable") {
-    return <section className="system-chart system-chart--unavailable"><p className="eyebrow">ZI WEI DOU SHU · 紫微斗数</p><h2>出生时间未知，十二宫不推算</h2><p>{reading.caveats[0]}</p></section>;
+    return <section className="system-chart system-chart--unavailable"><p className="eyebrow">ZI WEI DOU SHU · 紫微斗数</p><h2>出生时间未知，十二宫不推算</h2><p>{reading.caveats[0]}</p><ChartExplanation preview={explanation} /></section>;
   }
   return (
     <section className="system-chart ziwei-chart">
@@ -297,6 +318,7 @@ function ZiweiChartCard({ reading }: { reading: ZiweiReading }) {
         {reading.palaces.map((palace, index) => <article key={palace.id} style={{ gridArea: ziweiGridAreas[index] }} className={palace.name === "命宫" ? "is-soul" : palace.isBodyPalace ? "is-body" : ""}><header><b>{palace.name}</b><span>{palace.heavenlyStem}{palace.earthlyBranch}</span></header><p>{palace.majorStars.map((star) => <span key={star.name}>{star.name}{star.transformation ? <i>化{star.transformation}</i> : null}</span>)}</p>{!palace.majorStars.length && <small>无十四主星</small>}{palace.isBodyPalace && <em>身宫</em>}</article>)}
         <div className="ziwei-board__center"><small>命宫 · {reading.soulPalaceBranch}</small><strong>{reading.soulStar}</strong><span>{reading.fiveElementsClass}</span><p>身主 {reading.bodyStar} · 身宫 {reading.bodyPalaceBranch}</p></div>
       </div>
+      <ChartExplanation preview={explanation} />
       <details className="calculation-details"><summary>查看紫微计算规则与限制</summary><dl><div><dt>引擎</dt><dd>{reading.engine.id} {reading.engine.version}</dd></div><div><dt>流派配置</dt><dd>{reading.engine.school}</dd></div><div><dt>闰月</dt><dd>前后半月调整开启</dd></div><div><dt>大限方向</dt><dd>{reading.conventions.directionRule === "traditional-gender" ? "使用所选传统输入" : "未应用"}</dd></div></dl>{reading.caveats.map((caveat) => <p key={caveat}>{caveat}</p>)}</details>
     </section>
   );
@@ -310,7 +332,7 @@ function wheelPoint(longitude: number, radius: number) {
   return { x: 160 + Math.cos(angle) * radius, y: 160 + Math.sin(angle) * radius };
 }
 
-function WesternChartCard({ reading }: { reading: WesternReading }) {
+function WesternChartCard({ reading, explanation }: { reading: WesternReading; explanation: ChartExplanationPreview }) {
   const placements = reading.placements.slice(0, 10);
   const placementByBody = new Map(placements.map((placement) => [placement.body, placement]));
   return (
@@ -326,6 +348,7 @@ function WesternChartCard({ reading }: { reading: WesternReading }) {
         </svg>
         <div className="western-placements">{placements.map((placement) => <div key={placement.id}><span>{westernGlyphs[placement.body] ?? "•"}</span><b>{placement.body}</b><p>{placement.sign} {placement.degree}°{String(placement.minute).padStart(2, "0")}′{placement.house ? ` · H${placement.house}` : ""}</p>{placement.retrograde && <small>R</small>}</div>)}</div>
       </div>
+      <ChartExplanation preview={explanation} />
       <details className="calculation-details"><summary>查看西占计算规则与限制</summary><dl><div><dt>黄道</dt><dd>热带黄道</dd></div><div><dt>宫制</dt><dd>整宫制</dd></div><div><dt>时区</dt><dd>IANA 历史偏移 · UTC {reading.utcOffsetHours >= 0 ? "+" : ""}{reading.utcOffsetHours}</dd></div><div><dt>出生时刻</dt><dd>{reading.utcIso}</dd></div></dl>{reading.caveats.map((caveat) => <p key={caveat}>{caveat}</p>)}</details>
     </section>
   );
@@ -649,15 +672,20 @@ function LifeMapPage() {
   const { reading, experience, calculationError } = useActiveExperience();
   if (!experience) return <ErrorState route="life-map" title="命盘无法完成计算" message={calculationError ?? "请检查出生资料。"} href="/onboarding" action="检查出生资料" />;
   const identity = experience.domainInsights.identity;
+  const chartExplanations = {
+    bazi: getChartExplanationPreview(experience, "bazi"),
+    ziwei: getChartExplanationPreview(experience, "ziwei"),
+    astrology: getChartExplanationPreview(experience, "astrology"),
+  };
   return (
     <PageShell route="life-map">
       <div className="page life-map-page">
         <PhaseScopeNotice experience={experience} />
         <header className="map-hero"><div><p className="eyebrow">YOUR NATAL BLUEPRINT · 你的底图</p><h1>{identity.title.split(" · ")[0]}<br /><i>×</i> {identity.title.split(" · ")[1] ?? "观察"}</h1><p>{identity.summary}</p><div className="evidence-chips">{identity.evidence.map((item) => <EvidenceChip key={item.factId} system={item.system} role={item.role} />)}</div></div><div className="map-diagram" aria-label="三个计算体系汇聚为 Life Map 的抽象图"><span className="map-ring" /><span className="map-grid" /><span className="map-pillars" /><b>命</b></div></header>
         <div className="map-note"><span>如何阅读</span><p>这些领域不是命运评分，而是理解长期模式的入口。当前活跃表示本期内容的主题强调，不代表好或坏。</p></div>
-        <BaziChartCard reading={reading} id="bazi-chart" visual />
-        <ZiweiChartCard reading={experience.ziwei} />
-        <WesternChartCard reading={experience.western} />
+        <BaziChartCard reading={reading} explanation={chartExplanations.bazi} id="bazi-chart" visual />
+        <ZiweiChartCard reading={experience.ziwei} explanation={chartExplanations.ziwei} />
+        <WesternChartCard reading={experience.western} explanation={chartExplanations.astrology} />
         <section className="section-block"><SectionHeader eyebrow="EIGHT DOMAINS" title="八个生命领域" /><div className="domain-grid domain-grid--all">{experience.domains.map((domain, index) => <Link href={`/life-map/${domain.id}`} className="domain-card domain-card--wide" key={domain.id}><span className="domain-card__index">{String(index + 1).padStart(2, "0")}</span><div><small>{domain.nameEn}</small><h3>{domain.nameZh}</h3></div><p>{domain.pattern}</p><span className={`state state--${domain.state}`}>{domain.state === "active" ? "多源交集" : domain.state === "steady" ? "独立线索" : "保留张力"}</span><b aria-hidden="true">↗</b></Link>)}</div></section>
       </div>
     </PageShell>
