@@ -51,6 +51,40 @@ function formatGeneratedOn(value: Date | string) {
   return date;
 }
 
+export function buildDailyReport(experience: CalculatedExperience, generatedOn: Date | string = new Date()): LifeMapReport {
+  const date = formatGeneratedOn(generatedOn);
+  const { bazi, timing, todayInsight } = experience;
+  const evidence = todayInsight.evidence.map((reference) => {
+    const fact = experience.facts.find((item) => item.id === reference.factId);
+    if (!fact) throw new Error(`Missing daily report evidence: ${reference.factId}`);
+    return { reference, fact };
+  });
+  const evidenceSystems = [...new Set(evidence.map(({ fact }) => systemNames[fact.system]))].join("、");
+
+  return {
+    id: `life-map-daily-report-${experience.schemaVersion}-${experience.calculatedFor}`,
+    title: "今日反思报告",
+    owner: bazi.profile.displayName,
+    generatedOn: date,
+    engineLabel: `${experience.engine.id} v${experience.engine.version} · ${experience.schemaVersion}`,
+    disclaimer: "本报告用于个人反思与传统文化探索，不是科学预测，也不提供医疗、法律、财务、生育、死亡或安全建议。",
+    pages: [{
+      id: "daily",
+      number: 1,
+      eyebrow: "LIFE MAP DAILY · PRIVATE EDITION",
+      title: `${experience.calculatedFor} · ${todayInsight.title}`,
+      subtitle: todayInsight.subtitle,
+      blocks: [
+        { id: "daily-theme", kind: "traditional-reflection", label: `${todayInsight.kind.toUpperCase()} · ${evidenceSystems}`, title: "今日综合主题", body: todayInsight.summary },
+        { id: "daily-timing", kind: "calculated-fact", label: "DATED TIMING FACT", title: `${timing.title} · ${timing.start}—${timing.end}`, body: timing.facts.map((fact) => `${systemNames[fact.system]}：${fact.rawLabel}`).join("；") },
+        ...evidence.slice(0, 3).map(({ reference, fact }) => ({ id: `daily-${fact.id}`, kind: "calculated-fact" as const, label: `${systemNames[fact.system]} · EVIDENCE`, title: fact.label, body: `${reference.contribution} ${fact.rawLabel}` })),
+        { id: "daily-practice", kind: "practice", label: "TODAY'S PRACTICE", title: todayInsight.reflectionPrompt, body: "写下一个最直接的答案，再补充一条今天能够观察或验证的现实事实。" },
+        { id: "daily-boundary", kind: "methodology", label: "READING BOUNDARY", title: "快照不是预言", body: `${timing.disclaimer} 计算事实、传统主题与练习建议在本页保持分层。` },
+      ],
+    }],
+  };
+}
+
 export function buildLifeMapReport(experience: CalculatedExperience, generatedOn: Date | string = new Date()): LifeMapReport {
   const date = formatGeneratedOn(generatedOn);
   const { bazi, ziwei, western, timing, todayInsight } = experience;
@@ -75,7 +109,7 @@ export function buildLifeMapReport(experience: CalculatedExperience, generatedOn
 
   return {
     id: `life-map-report-${experience.schemaVersion}-${experience.calculatedFor}`,
-    title: "完整跨体系每日反思报告",
+    title: "十页跨体系详细报告",
     owner: bazi.profile.displayName,
     generatedOn: date,
     engineLabel: `${bazi.engine.id} v${bazi.engine.version} · ${ziwei.engine.id} v${ziwei.engine.version} · ${western.engine.id} v${western.engine.version} · ${experience.engine.id} v${experience.engine.version}`,

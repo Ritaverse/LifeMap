@@ -34,17 +34,20 @@ test("server-renders directly addressable product routes", async () => {
   }
 });
 
-test("server-renders the private report preview and $2 beta Shopify handoff", async () => {
+test("server-renders both one-time report tiers and evidence-grounded previews", async () => {
   const response = await render("/report");
   assert.equal(response.status, 200);
   const html = await response.text();
-  assert.match(html, /完整跨体系每日反思报告/);
-  assert.match(html, /购买测试版完整 PDF · USD \$2/);
-  assert.match(html, /先读三个完整章节/);
+  assert.match(html, /Daily Report/);
+  assert.match(html, /购买 Daily Report · \$1\.99/);
+  assert.match(html, /购买 10 页 Detailed Report · \$19\.99/);
+  assert.match(html, /一页的结构，先完整看清/);
+  assert.match(html, /十页目录与三个完整章节/);
   assert.match(html, /紫微十二宫/);
   assert.match(html, /西方本命盘/);
   assert.match(html, /今日综合洞察/);
-  assert.match(html, /Shopify 不接收出生资料或命盘内容/);
+  assert.match(html, /命盘内容不会发送给 Shopify/);
+  assert.match(html, /不会自动续费/);
   assert.match(html, /不是科学预测/);
   assert.doesNotMatch(html, /storefront-access-token/i);
 });
