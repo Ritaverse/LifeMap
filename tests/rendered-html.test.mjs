@@ -17,8 +17,15 @@ test("server-renders the Life Map landing experience", async () => {
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
   const html = await response.text();
-  assert.match(html, /<title>Life Map · 人生地图<\/title>/i);
-  assert.match(html, /把此刻的问题/);
+  assert.match(html, /<title>Life Map · 观星读象，照见更好的自己<\/title>/i);
+  assert.match(html, /观星读象/);
+  assert.match(html, /照见更好的自己/);
+  assert.match(html, /东方命理 × 西方占星 × 自我成长 × 同路社区/);
+  assert.match(html, /同路社区仍在生长/);
+  assert.match(html, /COMMUNITY IN THE MAKING/);
+  assert.match(html, /aria-label="Life Map 首页"/);
+  assert.match(html, /brand-mark__orbit/);
+  assert.match(html, /life-map-social\.png/);
   assert.match(html, /免费生成三体系快照/);
   assert.match(html, /象征物商城/);
   assert.match(html, /进入商城/);

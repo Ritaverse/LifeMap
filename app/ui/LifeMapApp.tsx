@@ -88,20 +88,33 @@ function useSessionFocus() {
 function BrandMark({ large = false }: { large?: boolean }) {
   return (
     <span className={`brand-mark ${large ? "brand-mark--large" : ""}`} aria-hidden="true">
-      <i /><i /><i /><i />
+      <span className="brand-mark__orbit" />
+      <span className="brand-mark__lens" />
+      <span className="brand-mark__self" />
+      <span className="brand-mark__anchors"><i /><i /><i /><i /></span>
     </span>
+  );
+}
+
+function BrandLockup({ tagline = false }: { tagline?: boolean }) {
+  return (
+    <>
+      <BrandMark />
+      <span className="wordmark__copy"><strong>Life Map</strong>{tagline && <small>星命相照 · 向内生长</small>}</span>
+    </>
   );
 }
 
 function PageShell({ route, title, eyebrow, children, backHref }: { route: RouteName; title?: string; eyebrow?: string; children: ReactNode; backHref?: string }) {
   const hasNav = !["landing", "onboarding", "generating"].includes(route);
+  const hasBrandFooter = !["onboarding", "generating"].includes(route);
   const activeKey = route === "domain" ? "life-map" : route === "insight" || route === "report" ? "today" : route === "objects" || route === "product" ? "objects" : route;
   return (
     <div className={`app-shell ${hasNav ? "app-shell--nav" : ""}`}>
       {hasNav && (
         <header className="topbar">
           <div className="topbar__inner">
-            <div className="topbar__lead">{backHref ? <Link href={backHref} className="icon-link" aria-label="返回">←</Link> : <Link href="/today" className="wordmark"><BrandMark /><span>Life Map</span></Link>}</div>
+            <div className="topbar__lead">{backHref ? <Link href={backHref} className="icon-link" aria-label="返回">←</Link> : <Link href="/today" className="wordmark" aria-label="Life Map 首页"><BrandLockup tagline /></Link>}</div>
             <nav className="desktop-nav" aria-label="网站主导航">
               {desktopNavItems.map((item) => <Link key={item.key} href={item.href} className={activeKey === item.key ? "is-active" : ""} aria-current={activeKey === item.key ? "page" : undefined}><span>{item.zh}</span><small>{item.en}</small></Link>)}
             </nav>
@@ -114,6 +127,15 @@ function PageShell({ route, title, eyebrow, children, backHref }: { route: Route
         </header>
       )}
       <main className={hasNav ? "main-content" : "main-content main-content--bare"}>{children}</main>
+      {hasBrandFooter && (
+        <footer className={`site-footer ${hasNav ? "" : "site-footer--bare"}`} aria-label="Life Map 品牌愿景">
+          <div className="site-footer__inner">
+            <div className="wordmark wordmark--footer"><BrandLockup tagline /></div>
+            <p>东方命理 × 西方占星，理解自己，与同路人一起成长。</p>
+            <small>COMMUNITY IN THE MAKING · 同路社区正在生长</small>
+          </div>
+        </footer>
+      )}
       {hasNav && (
         <nav className="bottom-nav" aria-label="移动端主要导航">
           <div className="bottom-nav__inner">
@@ -445,15 +467,15 @@ function LandingPage() {
     <PageShell route="landing">
       <div className="landing">
         <header className="landing__header">
-          <div className="wordmark"><BrandMark /><span>Life Map</span></div>
+          <Link href="/" className="wordmark" aria-label="Life Map 首页"><BrandLockup tagline /></Link>
           <nav className="landing__nav" aria-label="首页导航"><a href="#intentions">从问题开始</a><Link href="/objects">象征物商城</Link><a href="#principles">方法与依据</a></nav>
           <Link href={hasProfile ? "/today" : "/onboarding"} className="quiet-button quiet-button--active">{hasProfile ? "继续我的地图" : "开始生成"}</Link>
         </header>
-        <div className="landing__geometry" aria-hidden="true"><span className="orbit" /><span className="pillars" /><span className="broken-line" /></div>
+        <div className="landing__geometry" aria-hidden="true"><span className="orbit" /><span className="confluence-lens" /><span className="broken-line" /></div>
         <section className="landing__hero">
-          <p className="eyebrow">A TRACEABLE REFLECTION MAP · 可追溯的人生地图</p>
-          <h1>把此刻的问题<br />看得更清楚</h1>
-          <p className="landing__lead">从八字、紫微与西方占星的确定性事实出发，寻找共识、保留张力，再把洞察变成一个可以验证的小行动。</p>
+          <div className="landing__brand-intro"><BrandMark large /><div><p className="eyebrow">EASTERN WISDOM · WESTERN STARS · SHARED GROWTH</p><span>东方命理 × 西方占星 × 自我成长 × 同路社区</span></div></div>
+          <h1>观星读象，<br /><em>照见更好的自己</em></h1>
+          <p className="landing__lead">融合东方命理与西方占星，把古老的观察变成理解自己的语言、走向更好自己的行动，也为与同路人彼此照见、共同成长留出空间。</p>
           <div className="landing__actions">
             <Link href={hasProfile ? "/today" : "/onboarding"} className="button button--primary">{hasProfile ? "继续上次的地图" : "免费生成三体系快照"} <span aria-hidden="true">→</span></Link>
             <a href="#principles" className="button button--tertiary">了解我们如何解释</a>
@@ -475,6 +497,7 @@ function LandingPage() {
           <article><span>01</span><h2>先计算</h2><p>版本化引擎先生成八字、紫微与西占事实，不让语言模型代替排盘。</p></article>
           <article><span>02</span><h2>再解释</h2><p>每条重要洞察都能展开查看事实、传统解释、综合作用与限制。</p></article>
           <article><span>03</span><h2>最后行动</h2><p>产品不替你决定，而是帮助你保存一个现实中可以验证的小步骤。</p></article>
+          <article><span>04</span><h2>彼此照见</h2><p>同路社区仍在生长；未来会围绕真实问题、行动与复盘连接经验，不制造权威或焦虑。</p></article>
         </section>
       </div>
     </PageShell>
@@ -607,7 +630,7 @@ function OnboardingPage() {
   return (
     <PageShell route="onboarding">
       <div className="onboarding">
-        <header className="onboarding__header"><Link href="/" className="wordmark"><BrandMark /><span>Life Map</span></Link><span>创建你的地图</span></header>
+        <header className="onboarding__header"><Link href="/" className="wordmark" aria-label="Life Map 首页"><BrandLockup tagline /></Link><span>创建你的地图</span></header>
         <div className="progress-track" aria-label={`第 ${step + 1} 步，共 ${onboardingSteps.length} 步`}><i style={{ width: `${((step + 1) / onboardingSteps.length) * 100}%` }} /></div>
         <section className="onboarding__panel">
           <div className="step-count"><span>{current.number}</span><small>OF 04</small></div>
