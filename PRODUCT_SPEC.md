@@ -131,9 +131,10 @@ An object appears only after the product has established a theme and offered a n
 | Life Map | 命盘 | Stable blueprint and life-domain exploration |
 | Ask | 问 | Ask My Chart and I Ching |
 | Timing | 时运 | Current-period preview; deeper future timeline is later |
+| Shop | 商城 | Browse optional symbolic objects, materials, and design concepts |
 | Me | 我的 | Profile, preferences, and future relationship/object entry points |
 
-Objects are accessible from recommendations and the Me area. They are not a primary navigation tab in Phase 1.
+Desktop web navigation exposes all six destinations. Mobile keeps five bottom destinations—Today, Life Map, Ask, Shop, and Me—while Timing remains directly accessible from Today and its content links. Direct catalog browsing is allowed, but personalized recommendations still follow insight → free practice → optional object.
 
 ### Route map
 
@@ -536,4 +537,3 @@ After visual and product validation, later phases may add:
 - Human expert sessions
 
 None of these should distort the Phase 1 architecture into premature production complexity.
-

@@ -20,6 +20,8 @@ test("server-renders the Life Map landing experience", async () => {
   assert.match(html, /<title>Life Map · 人生地图<\/title>/i);
   assert.match(html, /把此刻的问题/);
   assert.match(html, /免费生成三体系快照/);
+  assert.match(html, /象征物商城/);
+  assert.match(html, /进入商城/);
   assert.match(html, /不是科学预测/);
   assert.doesNotMatch(html, /codex-preview|react-loading-skeleton/i);
 });
@@ -86,6 +88,12 @@ test("server-renders original product imagery with useful alternative text", asy
   const response = await render("/objects");
   assert.equal(response.status, 200);
   const html = await response.text();
+  assert.match(html, /LIFE MAP OBJECTS · ONLINE SHOP/);
+  assert.match(html, /浏览全部商品/);
+  assert.match(html, /天然石/);
+  assert.match(html, /五行手链/);
+  assert.match(html, /命盘艺术/);
+  assert.match(html, /无功效承诺/);
   assert.match(html, /\/images\/products\/green-aventurine\.jpg/);
   assert.match(html, /一块置于深色石台上的天然绿东陵石/);
   assert.match(html, /\/images\/products\/personal-life-map-art\.jpg/);

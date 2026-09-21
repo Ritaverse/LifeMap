@@ -6,21 +6,21 @@ export async function generateMetadata(): Promise<Metadata> {
   const requestHeaders = await headers();
   const host = requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host") ?? "localhost:3000";
   const protocol = requestHeaders.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
-  const socialImage = `${protocol}://${host}/og-journey-v2.png`;
-  const description = "从八字、紫微与西方占星的确定性事实出发，把此刻的问题变成可追溯的洞察与一个可验证的小行动。";
+  const socialImage = `${protocol}://${host}/og.png`;
+  const description = "从可追溯的多体系反思地图出发，把一个主题变成现实行动，也可以在象征物商城为它选择日常载体。";
 
   return {
     title: { default: "Life Map · 人生地图", template: "%s · Life Map" },
     description,
     openGraph: {
-      title: "Life Map · 把此刻的问题看得更清楚",
+      title: "Life Map · 看见自己，也把主题带进日常",
       description,
       type: "website",
       images: [{ url: socialImage, width: 1200, height: 630, alt: "Life Map 品牌预览" }],
     },
     twitter: {
       card: "summary_large_image",
-    title: "Life Map · 把此刻的问题看得更清楚",
+      title: "Life Map · 看见自己，也把主题带进日常",
       description,
       images: [socialImage],
     },

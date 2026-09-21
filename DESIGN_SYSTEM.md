@@ -236,8 +236,8 @@ When `prefers-reduced-motion: reduce` is enabled:
 
 ### 8.3 Bottom navigation
 
-- Five destinations: Today, Life Map, Ask, Timing, Me
-- Use one centered floating dock on mobile and desktop so the product feels like a personal instrument rather than a dashboard sidebar
+- Five mobile destinations: Today, Life Map, Ask, Shop, Me. Timing remains available from Today and direct links.
+- Use a centered floating dock on mobile only. At 1024 px and above, switch to a conventional sticky website header with Today, Life Map, Ask, Timing, Shop, and Me.
 - Ask may receive a distinctive central mark, but must not become an oversized floating novelty button
 - Active state uses lunar-white text plus a rose-to-sky indicator; inactive state uses muted lavender
 - Label remains visible; do not rely on icons alone

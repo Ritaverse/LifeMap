@@ -35,13 +35,16 @@ const systemLabels: Record<SystemId, { short: string; full: string }> = {
   astrology: { short: "占星", full: "Western Astrology · 西方占星" },
 };
 
-const navItems = [
+const desktopNavItems = [
   { href: "/today", key: "today", zh: "今日", en: "Today", mark: "日" },
   { href: "/life-map", key: "life-map", zh: "命盘", en: "Life Map", mark: "命" },
   { href: "/ask", key: "ask", zh: "问", en: "Ask", mark: "问" },
   { href: "/timing", key: "timing", zh: "时运", en: "Timing", mark: "时" },
+  { href: "/objects", key: "objects", zh: "商城", en: "Shop", mark: "物" },
   { href: "/me", key: "me", zh: "我的", en: "Me", mark: "我" },
 ];
+
+const mobileNavItems = desktopNavItems.filter((item) => item.key !== "timing");
 
 const focusOptions: Array<{ id: ReflectionFocus; label: string; title: string; description: string; prompt: string }> = [
   { id: "relationships", label: "关系", title: "看清重复的关系模式", description: "把靠近、空间、边界和回应说得更具体。", prompt: "为什么我和亲近的人总会重复类似的冲突？" },
@@ -92,26 +95,29 @@ function BrandMark({ large = false }: { large?: boolean }) {
 
 function PageShell({ route, title, eyebrow, children, backHref }: { route: RouteName; title?: string; eyebrow?: string; children: ReactNode; backHref?: string }) {
   const hasNav = !["landing", "onboarding", "generating"].includes(route);
-  const activeKey = route === "domain" ? "life-map" : route === "insight" || route === "report" ? "today" : route === "objects" || route === "product" ? "me" : route;
+  const activeKey = route === "domain" ? "life-map" : route === "insight" || route === "report" ? "today" : route === "objects" || route === "product" ? "objects" : route;
   return (
     <div className={`app-shell ${hasNav ? "app-shell--nav" : ""}`}>
       {hasNav && (
         <header className="topbar">
           <div className="topbar__inner">
-            {backHref ? <Link href={backHref} className="icon-link" aria-label="返回">←</Link> : <Link href="/today" className="wordmark"><BrandMark /><span>Life Map</span></Link>}
+            <div className="topbar__lead">{backHref ? <Link href={backHref} className="icon-link" aria-label="返回">←</Link> : <Link href="/today" className="wordmark"><BrandMark /><span>Life Map</span></Link>}</div>
+            <nav className="desktop-nav" aria-label="网站主导航">
+              {desktopNavItems.map((item) => <Link key={item.key} href={item.href} className={activeKey === item.key ? "is-active" : ""} aria-current={activeKey === item.key ? "page" : undefined}><span>{item.zh}</span><small>{item.en}</small></Link>)}
+            </nav>
             <div className="topbar__context">
               {eyebrow && <span>{eyebrow}</span>}
               {title && <strong>{title}</strong>}
             </div>
-            <Link href="/me" className="profile-link" aria-label="个人资料">Y</Link>
+            <div className="topbar__actions"><Link href="/me" className="profile-link" aria-label="个人资料">Y</Link></div>
           </div>
         </header>
       )}
       <main className={hasNav ? "main-content" : "main-content main-content--bare"}>{children}</main>
       {hasNav && (
-        <nav className="bottom-nav" aria-label="主要导航">
+        <nav className="bottom-nav" aria-label="移动端主要导航">
           <div className="bottom-nav__inner">
-            {navItems.map((item) => (
+            {mobileNavItems.map((item) => (
               <Link key={item.key} href={item.href} className={activeKey === item.key ? "is-active" : ""} aria-current={activeKey === item.key ? "page" : undefined}>
                 <span className="nav-mark" aria-hidden="true">{item.mark}</span>
                 <span>{item.zh}</span>
@@ -434,10 +440,15 @@ function LandingPage() {
       setLatestReflection(readReflections()[0] ?? null);
     });
   }, []);
+  const shopPreview = [products.find((product) => product.category === "bracelet"), products.find((product) => product.featured), products.find((product) => product.category === "chart-art")].filter((product): product is Product => Boolean(product));
   return (
     <PageShell route="landing">
       <div className="landing">
-        <header className="landing__header"><div className="wordmark"><BrandMark /><span>Life Map</span></div>{hasProfile && <Link href="/today" className="quiet-button quiet-button--active">继续我的地图</Link>}</header>
+        <header className="landing__header">
+          <div className="wordmark"><BrandMark /><span>Life Map</span></div>
+          <nav className="landing__nav" aria-label="首页导航"><a href="#intentions">从问题开始</a><Link href="/objects">象征物商城</Link><a href="#principles">方法与依据</a></nav>
+          <Link href={hasProfile ? "/today" : "/onboarding"} className="quiet-button quiet-button--active">{hasProfile ? "继续我的地图" : "开始生成"}</Link>
+        </header>
         <div className="landing__geometry" aria-hidden="true"><span className="orbit" /><span className="pillars" /><span className="broken-line" /></div>
         <section className="landing__hero">
           <p className="eyebrow">A TRACEABLE REFLECTION MAP · 可追溯的人生地图</p>
@@ -451,9 +462,14 @@ function LandingPage() {
           <p className="disclosure">基于传统解释体系的个人反思体验，不是科学预测、专业建议或结果保证。</p>
         </section>
         {latestReflection && <section className="return-card"><div><p className="eyebrow">CONTINUE YOUR THREAD · 继续上次的问题</p><h2>{latestReflection.question}</h2><p>你为这件事保存了一个行动，可以回到地图继续观察和复盘。</p></div><Link href="/today" className="button button--secondary">继续查看</Link></section>}
-        <section className="landing__intentions" aria-labelledby="landing-intentions-title">
+        <section id="intentions" className="landing__intentions" aria-labelledby="landing-intentions-title">
           <div><p className="eyebrow">START WITH WHAT MATTERS</p><h2 id="landing-intentions-title">你现在最想看清什么？</h2></div>
           <div className="intent-grid">{focusOptions.map((option) => <Link href={`/onboarding?intent=${option.id}`} key={option.id}><span>{option.label}</span><h3>{option.title}</h3><p>{option.description}</p><b aria-hidden="true">→</b></Link>)}</div>
+        </section>
+        <section className="landing-shop" aria-labelledby="landing-shop-title">
+          <header><div><p className="eyebrow">LIFE MAP OBJECTS · 象征物商城</p><h2 id="landing-shop-title">让一个主题，在日常里有具体的位置</h2><p>天然石、五行手链与个人命盘艺术。每件物品都清楚说明材质、传统关联与普通用法，不承诺改变运气或现实结果。</p></div><Link href="/objects" className="button button--secondary">进入商城 <span aria-hidden="true">→</span></Link></header>
+          <div className="landing-shop__grid">{shopPreview.map((product) => <Link href={`/objects/${product.slug}`} key={product.id} className="landing-shop__card"><ProductVisual product={product} compact /><div><small>{product.category === "stone" ? "天然石" : product.category === "bracelet" ? "五行手链" : "命盘艺术"}</small><h3>{product.nameZh}</h3><p>{product.nameEn}</p><strong>{product.price}</strong></div></Link>)}</div>
+          <p className="landing-shop__note">商城可以直接浏览；个性化推荐仍只会在你先看到洞察与免费练习之后出现。</p>
         </section>
         <section id="principles" className="landing__principles" aria-label="产品原则">
           <article><span>01</span><h2>先计算</h2><p>版本化引擎先生成八字、紫微与西占事实，不让语言模型代替排盘。</p></article>
@@ -997,9 +1013,18 @@ function ReportPage() {
 }
 
 function ObjectsPage() {
+  const [category, setCategory] = useState<"all" | Product["category"]>("all");
+  const featuredProduct = products.find((product) => product.category === "bracelet") ?? products[0];
+  const visibleProducts = category === "all" ? products : products.filter((product) => product.category === category);
+  const categoryOptions: Array<{ id: "all" | Product["category"]; label: string }> = [{ id: "all", label: "全部" }, { id: "stone", label: "天然石" }, { id: "bracelet", label: "五行手链" }, { id: "chart-art", label: "命盘艺术" }];
   return (
-    <PageShell route="objects" title="象征物 / Objects" eyebrow="OPTIONAL RITUALS" backHref="/me">
-      <div className="page objects-page"><header className="page-heading"><p className="eyebrow">OBJECTS WITH CONTEXT</p><h1>把一个主题<br />带进日常</h1><p>这些物品是可选的象征提醒，不是补救、保护或改变命运的工具。每个推荐都先提供一个不需要购买的日常练习。</p></header><div className="product-grid">{products.map((product) => <Link href={`/objects/${product.slug}`} key={product.id} className="product-card"><ProductVisual product={product} compact /><div><small>{product.category.replace("-", " ")}</small><h2>{product.nameEn}</h2><h3>{product.nameZh}</h3><p>{product.shortDescription}</p><span>{product.price}</span></div></Link>)}</div></div>
+    <PageShell route="objects" title="象征物商城" eyebrow="LIFE MAP SHOP">
+      <div className="page objects-page">
+        <header className="shop-hero"><div><p className="eyebrow">LIFE MAP OBJECTS · ONLINE SHOP</p><h1>象征物商城</h1><p>为已经被看见的主题，选择一件可以放进日常的物品。这里出售的是材质、设计与纪念意义，不是转运、疗愈或结果保证。</p><div className="shop-assurances"><span>材质信息透明</span><span>象征关联可解释</span><span>无功效承诺</span></div></div><ProductVisual product={featuredProduct} compact /></header>
+        <section className="shop-feature"><div><p className="eyebrow">FEATURED · PERSONAL EDITION</p><h2>{featuredProduct.nameZh}</h2><p>{featuredProduct.shortDescription}</p><div className="pill-row">{featuredProduct.intentions.map((item) => <span key={item}>{item}</span>)}</div></div><div><strong>{featuredProduct.price}</strong><Link href={`/objects/${featuredProduct.slug}`} className="button button--primary">查看主推商品 <span aria-hidden="true">→</span></Link></div></section>
+        <section className="shop-catalog" aria-labelledby="shop-catalog-title"><div className="shop-catalog__heading"><div><p className="eyebrow">BROWSE THE COLLECTION</p><h2 id="shop-catalog-title">浏览全部商品</h2></div><div className="shop-filters" aria-label="商品分类">{categoryOptions.map((option) => <button key={option.id} type="button" aria-pressed={category === option.id} onClick={() => setCategory(option.id)}>{option.label}</button>)}</div></div><div className="product-grid">{visibleProducts.map((product) => <Link href={`/objects/${product.slug}`} key={product.id} className="product-card"><ProductVisual product={product} compact /><div><small>{product.category === "stone" ? "天然石" : product.category === "bracelet" ? "五行手链" : "命盘艺术"}</small><h2>{product.nameEn}</h2><h3>{product.nameZh}</h3><p>{product.shortDescription}</p><footer><span>{product.price}</span><b>查看详情 →</b></footer></div></Link>)}</div></section>
+        <aside className="shop-boundary"><p className="eyebrow">A CLEAR BOUNDARY · 商城边界</p><h2>先有理解，再谈物品</h2><p>直接浏览商城不会生成“你需要购买”的判断。个性化推荐必须说明它连接到哪个主题，并先给出一个不花钱也能完成的日常练习。</p><Link href="/today" className="text-link">回到我的地图 <span aria-hidden="true">→</span></Link></aside>
+      </div>
     </PageShell>
   );
 }
@@ -1011,7 +1036,7 @@ function ProductPage({ id }: { id?: string }) {
   const isFeatured = product.id === recommendation.productId;
   return (
     <PageShell route="product" title="象征物详情" eyebrow="OBJECT DETAIL" backHref="/objects">
-      <div className="page product-page"><div className="product-layout"><div className="product-gallery"><ProductVisual product={product} /><div className="gallery-thumbs"><button aria-label="查看主图" className="is-active"><span /></button><button aria-label="查看材质细节"><span /></button><button aria-label="查看日常使用情境"><span /></button></div></div><article className="product-detail"><p className="eyebrow">PERSONAL SYMBOL · OPTIONAL</p><h1>{product.nameEn}</h1><h2>{product.nameZh}</h2><p className="product-intro">{product.shortDescription}</p>{isFeatured && <><section className="why-section"><p className="eyebrow">WHY IT SHOWED UP FOR YOU</p><h3>{recommendation.headline}</h3><p>{recommendation.summary}</p><div className="reason-list">{recommendation.reasons.map((reason) => <article key={reason.id}><span>{reason.label}</span><p>{reason.explanation}</p></article>)}</div></section><section className="practice practice--large"><span>{recommendation.nonCommercialPractice.title}</span><p>{recommendation.nonCommercialPractice.instruction}</p></section></>}<section className="association"><p className="eyebrow">TRADITIONAL ASSOCIATION</p><p>{product.traditionalMeaning}</p><div className="pill-row">{product.elements.concat(product.intentions).map((item) => <span className="pill" key={item}>{item}</span>)}</div></section><section className="daily-use"><p className="eyebrow">A SIMPLE DAILY USE</p><h3>让它成为一个动作提示</h3><p>{product.dailyUse}</p></section><details className="product-info" open><summary>材质与信息</summary><dl><div><dt>材质</dt><dd>{product.material}</dd></div><div><dt>产地</dt><dd>{product.origin}</dd></div><div><dt>尺寸</dt><dd>{product.dimensions}</dd></div><div><dt>养护</dt><dd>{product.care}</dd></div></dl></details><div className="product-action"><div><small>演示价格</small><strong>{product.price}</strong></div><button className="button button--primary" aria-pressed={saved} onClick={() => setSaved((value) => !value)}>{saved ? "已加入愿望清单" : "加入愿望清单"}</button></div><p className="wishlist-status" aria-live="polite">{saved ? "已在当前演示会话中保存。" : ""}</p><p className="disclosure">{isFeatured ? recommendation.disclaimer : "这些关联来自传统及现代象征文化，不是科学功效或结果保证。"} Phase 1 不提供购买。</p></article></div></div>
+      <div className="page product-page"><div className="product-layout"><div className="product-gallery"><ProductVisual product={product} /><div className="gallery-thumbs"><button aria-label="查看主图" className="is-active"><span /></button><button aria-label="查看材质细节"><span /></button><button aria-label="查看日常使用情境"><span /></button></div></div><article className="product-detail"><p className="eyebrow">PERSONAL SYMBOL · OPTIONAL</p><h1>{product.nameEn}</h1><h2>{product.nameZh}</h2><p className="product-intro">{product.shortDescription}</p>{isFeatured && <><section className="why-section"><p className="eyebrow">WHY IT SHOWED UP FOR YOU</p><h3>{recommendation.headline}</h3><p>{recommendation.summary}</p><div className="reason-list">{recommendation.reasons.map((reason) => <article key={reason.id}><span>{reason.label}</span><p>{reason.explanation}</p></article>)}</div></section><section className="practice practice--large"><span>{recommendation.nonCommercialPractice.title}</span><p>{recommendation.nonCommercialPractice.instruction}</p></section></>}<section className="association"><p className="eyebrow">TRADITIONAL ASSOCIATION</p><p>{product.traditionalMeaning}</p><div className="pill-row">{product.elements.concat(product.intentions).map((item) => <span className="pill" key={item}>{item}</span>)}</div></section><section className="daily-use"><p className="eyebrow">A SIMPLE DAILY USE</p><h3>让它成为一个动作提示</h3><p>{product.dailyUse}</p></section><details className="product-info" open><summary>材质与信息</summary><dl><div><dt>材质</dt><dd>{product.material}</dd></div><div><dt>产地</dt><dd>{product.origin}</dd></div><div><dt>尺寸</dt><dd>{product.dimensions}</dd></div><div><dt>养护</dt><dd>{product.care}</dd></div></dl></details><div className="product-action"><div><small>参考价格</small><strong>{product.price}</strong></div><button className="button button--primary" aria-pressed={saved} onClick={() => setSaved((value) => !value)}>{saved ? "已加入愿望清单" : "加入愿望清单"}</button></div><p className="wishlist-status" aria-live="polite">{saved ? "已在当前演示会话中保存。" : ""}</p><p className="disclosure">{isFeatured ? recommendation.disclaimer : "这些关联来自传统及现代象征文化，不是科学功效或结果保证。"} 当前商城为商品与愿望清单预览，实物结账尚未开放。</p></article></div></div>
     </PageShell>
   );
 }
@@ -1032,7 +1057,7 @@ function MePage() {
         <section className="profile-card"><SectionHeader eyebrow="BIRTH PROFILE" title="出生信息" /><dl><div><dt>出生日期</dt><dd>{reading.profile.birthDate}</dd></div><div><dt>出生时间</dt><dd>{reading.profile.birthTime ?? "未知"}</dd></div><div><dt>出生地点</dt><dd>{reading.place.label}</dd></div><div><dt>时区</dt><dd>{reading.place.timeZone}</dd></div><div><dt>状态</dt><dd><span className="calculation-label">三体系计算完成</span></dd></div></dl><Link href="/onboarding" className="text-link">重新输入资料 →</Link></section>
         <section className="reflection-history" id="reflection-history"><SectionHeader eyebrow="YOUR THREADS" title="问题与行动" action={reflections.length ? `${reflections.length} 条记录` : undefined} />{reflections.length ? <div>{reflections.map((reflection) => <article key={reflection.id}><span>{focusOption(reflection.focus).label}</span><div><h3>{reflection.question}</h3><p>{reflection.action}</p><small>{reflection.reviewDate ? `计划复盘 ${reflection.reviewDate}` : "未设置复盘日期"}</small></div><button type="button" aria-label={`删除问题：${reflection.question}`} onClick={() => setReflections(removeReflection(reflection.id))}>删除</button></article>)}</div> : <div className="empty-thread"><p>还没有保存问题。完成一次决策反思后，你的行动和复盘日期会出现在这里。</p><Link href="/ask" className="button button--secondary">开始一个问题</Link></div>}<p className="reflection-history__privacy">当前阶段只保存在本次浏览器会话中。账号同步、跨设备记忆与提醒尚未启用。</p></section>
         <details className="profile-chart"><summary>查看我的四柱计算事实</summary><BaziChartCard reading={reading} /></details>
-        <section className="menu-list"><Link href="/report"><span>完整每日报告</span><small>生成十页跨体系私人 PDF · USD $2</small><b>→</b></Link><Link href="/objects"><span>象征物收藏</span><small>查看所有演示物品</small><b>→</b></Link><button disabled><span>关系档案</span><small>后续阶段开放</small><b>即将开放</b></button><button disabled><span>通知与每日提醒</span><small>后续阶段开放</small><b>即将开放</b></button></section>
+        <section className="menu-list"><Link href="/report"><span>完整每日报告</span><small>生成十页跨体系私人 PDF · USD $2</small><b>→</b></Link><Link href="/objects"><span>象征物商城</span><small>浏览天然石、五行手链与命盘艺术</small><b>→</b></Link><button disabled><span>关系档案</span><small>后续阶段开放</small><b>即将开放</b></button><button disabled><span>通知与每日提醒</span><small>后续阶段开放</small><b>即将开放</b></button></section>
         <section className="trust-card"><p className="eyebrow">TRUST & PRIVACY</p><h2>你的信息，只留在这次浏览会话</h2><p>出生资料只保存在当前浏览器会话中，不会上传、写入账户或发送分析事件。关闭会话后浏览器会清除它。</p><ul><li>八字、紫微和西占由版本锁定的本地引擎计算</li><li>时运使用 {experience.calculatedFor} 的干支、紫微运限与行星角距快照</li><li>综合解释由规则生成，不调用实时 AI 或追踪</li></ul><button className="text-button text-button--danger" onClick={clearProfile}>清除本次出生资料</button></section>
       </div>
     </PageShell>
