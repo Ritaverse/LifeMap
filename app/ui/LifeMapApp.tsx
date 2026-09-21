@@ -800,7 +800,22 @@ function LifeMapPage() {
     <PageShell route="life-map">
       <div className="page life-map-page">
         <PhaseScopeNotice experience={experience} />
-        <header className="map-hero"><div><p className="eyebrow">YOUR NATAL BLUEPRINT · 你的底图</p><h1>{identity.title.split(" · ")[0]}<br /><i>×</i> {identity.title.split(" · ")[1] ?? "观察"}</h1><p>{identity.summary}</p><div className="evidence-chips">{identity.evidence.map((item) => <EvidenceChip key={item.factId} system={item.system} role={item.role} />)}</div></div><div className="map-diagram" aria-label="三个计算体系汇聚为 Life Map 的抽象图"><span className="map-ring" /><span className="map-grid" /><span className="map-pillars" /><b>命</b></div></header>
+        <header className="map-hero">
+          <div><p className="eyebrow">YOUR NATAL BLUEPRINT · 你的底图</p><h1>{identity.title.split(" · ")[0]}<br /><i>×</i> {identity.title.split(" · ")[1] ?? "观察"}</h1><p>{identity.summary}</p><div className="evidence-chips">{identity.evidence.map((item) => <EvidenceChip key={item.factId} system={item.system} role={item.role} />)}</div></div>
+          <figure className="map-diagram">
+            <Image
+              className="map-diagram__image"
+              src="/images/brand/life-map-confluence.webp"
+              alt="东方四柱与西方星盘交织的 Life Map 品牌抽象图"
+              width={768}
+              height={768}
+              preload
+              unoptimized
+            />
+            <span className="map-diagram__core" aria-hidden="true"><BrandMark large /><b>命</b></span>
+            <figcaption>BRAND SYMBOL · 品牌意象，非实际排盘</figcaption>
+          </figure>
+        </header>
         <div className="map-note"><span>如何阅读</span><p>这些领域不是命运评分，而是理解长期模式的入口。当前活跃表示本期内容的主题强调，不代表好或坏。</p></div>
         <section className="section-block"><SectionHeader eyebrow="EIGHT DOMAINS" title="先从生活领域进入" /><div className="domain-grid domain-grid--all">{experience.domains.map((domain, index) => <Link href={`/life-map/${domain.id}`} className="domain-card domain-card--wide" key={domain.id}><span className="domain-card__index">{String(index + 1).padStart(2, "0")}</span><div><small>{domain.nameEn}</small><h3>{domain.nameZh}</h3></div><p>{domain.pattern}</p><span className={`state state--${domain.state}`}>{domain.state === "active" ? "多源交集" : domain.state === "steady" ? "独立线索" : "保留张力"}</span><b aria-hidden="true">↗</b></Link>)}</div></section>
         <section className="chart-lab">

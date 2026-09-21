@@ -80,6 +80,12 @@ test("server-renders the interactive BaZi chart from calculated facts", async ()
   assert.match(html, /阅读边界/);
   assert.match(html, /所有计算细节保持免费可查/);
   assert.match(html, /完整盘负责展示/);
+  assert.match(html, /\/images\/brand\/life-map-confluence\.webp/);
+  assert.match(html, /alt="东方四柱与西方星盘交织的 Life Map 品牌抽象图"/);
+  assert.match(html, /width="768"/);
+  assert.match(html, /height="768"/);
+  assert.match(html, /品牌意象，非实际排盘/);
+  assert.doesNotMatch(html, /map-grid|map-pillars/);
   assert.doesNotMatch(html, /正式 PDF 为 USD \$2/);
   assert.match(html, /<svg\b/i);
 });

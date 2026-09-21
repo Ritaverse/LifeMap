@@ -568,14 +568,15 @@ h1, h2, h3, p { margin-top: 0; }
 .map-hero h1 { margin-bottom: 24px; font-family: var(--font-editorial); font-size: clamp(48px, 8vw, 78px); font-weight: 400; letter-spacing: -.025em; line-height: 1; }
 .map-hero h1 i { color: var(--color-cinnabar); font-style: normal; }
 .map-hero > div:first-child > p:not(.eyebrow) { max-width: 570px; }
-.map-diagram { position: relative; display: grid; place-items: center; width: min(100%, 360px); aspect-ratio: 1; margin: 0 auto; }
-.map-ring { position: absolute; inset: 3%; border: 1px solid rgb(225 185 255 / 42%); border-radius: 50%; box-shadow: 0 0 70px rgb(225 185 255 / 7%); }
-.map-ring::before, .map-ring::after { position: absolute; border: 1px solid var(--color-line); border-radius: 50%; content: ""; }
-.map-ring::before { inset: 18%; }
-.map-ring::after { inset: 39%; background: radial-gradient(circle at 36% 32%, rgb(251 248 255 / 9%), var(--color-jade-soft)); box-shadow: 0 0 50px rgb(142 216 237 / 8%); }
-.map-grid { position: absolute; inset: 22%; background: linear-gradient(var(--color-line-strong) 1px, transparent 1px), linear-gradient(90deg, var(--color-line-strong) 1px, transparent 1px); background-size: 25% 25%; opacity: .6; transform: rotate(11deg); }
-.map-pillars { position: absolute; left: 20%; width: 10%; height: 53%; border-right: 5px double var(--color-cinnabar); border-left: 2px solid var(--color-cinnabar); opacity: .48; }
-.map-diagram b { position: relative; z-index: 2; font-family: var(--font-editorial); font-size: 36px; font-weight: 500; }
+.map-diagram { position: relative; isolation: isolate; display: grid; place-items: center; width: min(100%, 360px); aspect-ratio: 1; margin: 0 auto; overflow: hidden; border-radius: 50%; background: radial-gradient(circle, #251744 0 42%, var(--color-canvas) 74%); box-shadow: 0 30px 90px rgb(8 3 24 / 42%), 0 0 70px rgb(185 118 255 / 12%); }
+.map-diagram::before { position: absolute; z-index: 2; inset: 2.5%; border: 1px solid rgb(225 185 255 / 36%); border-radius: 50%; box-shadow: inset 0 0 34px rgb(225 185 255 / 6%), 0 0 24px rgb(185 118 255 / 8%); content: ""; pointer-events: none; }
+.map-diagram::after { position: absolute; z-index: 1; inset: 0; background: radial-gradient(circle at center, transparent 0 33%, rgb(22 14 47 / 4%) 48%, rgb(22 14 47 / 36%) 93%, var(--color-canvas) 100%); content: ""; pointer-events: none; }
+.map-diagram__image { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; animation: image-settle 900ms var(--ease-ritual) both; }
+.map-diagram__core { position: relative; z-index: 3; display: grid; place-items: center; width: 23%; aspect-ratio: 1; border: 1px solid rgb(225 185 255 / 38%); border-radius: 50%; background: radial-gradient(circle at 40% 32%, rgb(57 38 91 / 94%), rgb(22 14 47 / 86%)); box-shadow: 0 0 0 6px rgb(22 14 47 / 18%), 0 0 38px rgb(185 118 255 / 19%), inset 0 1px 0 rgb(251 248 255 / 14%); backdrop-filter: blur(8px); }
+.map-diagram__core .brand-mark { --brand-mark-size: 78%; position: absolute; opacity: .78; }
+.map-diagram__core .brand-mark__self { opacity: 0; animation: none; }
+.map-diagram__core > b { position: relative; z-index: 2; color: var(--color-ink); font-family: var(--font-editorial); font-size: clamp(22px, 7vw, 30px); font-weight: 500; text-shadow: 0 0 18px rgb(251 248 255 / 36%); }
+.map-diagram figcaption { position: absolute; z-index: 3; bottom: 7.5%; padding: 5px 9px; border: 1px solid rgb(225 185 255 / 18%); border-radius: var(--radius-pill); background: rgb(22 14 47 / 58%); color: rgb(217 203 232 / 72%); font-size: 7px; font-weight: 700; letter-spacing: .11em; backdrop-filter: blur(8px); }
 .map-note { display: grid; grid-template-columns: 110px 1fr; gap: 24px; padding: 20px 0; border-top: 1px solid var(--color-line); border-bottom: 1px solid var(--color-line); }
 .map-note span { color: var(--color-jade); font-size: 11px; font-weight: 750; letter-spacing: .06em; }
 .map-note p { margin: 0; font-size: 12px; }
@@ -1023,13 +1024,13 @@ h1, h2, h3, p { margin-top: 0; }
 .landing__geometry::before { top: 12%; left: 31%; }
 .landing__geometry::after { right: 14%; bottom: 23%; width: 4px; height: 4px; animation-delay: -2.1s; }
 .today-hero { background: radial-gradient(circle at 83% 12%, rgb(223 142 255 / 19%), transparent 31%), radial-gradient(circle at 6% 100%, rgb(94 153 255 / 12%), transparent 35%), linear-gradient(135deg, #342152 0%, #291a46 48%, #1e1434 100%); }
-.today-hero__motif, .map-ring, .ask-orbit, .generation-orbit, .report-cover-mark { filter: drop-shadow(0 0 22px rgb(185 118 255 / 15%)); }
+.today-hero__motif, .map-diagram, .ask-orbit, .generation-orbit, .report-cover-mark { filter: drop-shadow(0 0 22px rgb(185 118 255 / 15%)); }
 .quick-card, .domain-card, .timing-card, .symbol-section, .recommendation-card, .evidence-row, .dimensions-card, .timeline-large, .signal-list article, .report-offer, .report-tier-card, .report-final-cta, .product-card, .profile-card, .trust-card, .review-card, .system-chart, .bazi-chart { backdrop-filter: blur(14px) saturate(1.08); }
 .quick-card:hover, .domain-card:hover, .product-card:hover { box-shadow: var(--shadow-soft), inset 0 1px 0 rgb(251 248 255 / 12%); }
 .field input, .field select, .field textarea, .choice-field span, .check-field, .quiet-button, .icon-link { backdrop-filter: blur(12px); }
 .field input:focus, .field select:focus, .field textarea:focus { border-color: var(--color-cinnabar); box-shadow: 0 0 0 3px rgb(242 147 213 / 14%), 0 0 22px rgb(139 91 220 / 12%); }
 .progress-track i, .timeline-track::before { background: linear-gradient(90deg, var(--color-cinnabar), #ad76f0, var(--color-jade)); }
-.bazi-wheel__core strong, .bazi-node > b, .pillar-inspector > header h3, .bazi-pillars strong, .ziwei-board > article p, .ziwei-board__center strong, .ziwei-board__center span, .western-wheel .planet-node text, .western-placements > div > span, .day-seal span, .state-mark, .element-symbol span, .system-seal, .map-diagram b, .ask-orbit span, .coins span, .iching-result h1, .report-offer__folio span, .report-cover-mark strong { font-family: var(--font-symbol); }
+.bazi-wheel__core strong, .bazi-node > b, .pillar-inspector > header h3, .bazi-pillars strong, .ziwei-board > article p, .ziwei-board__center strong, .ziwei-board__center span, .western-wheel .planet-node text, .western-placements > div > span, .day-seal span, .state-mark, .element-symbol span, .system-seal, .map-diagram__core > b, .ask-orbit span, .coins span, .iching-result h1, .report-offer__folio span, .report-cover-mark strong { font-family: var(--font-symbol); }
 .western-wheel > circle { fill: rgb(22 14 47 / 72%); }
 .western-wheel > circle:nth-of-type(3) { fill: rgb(53 35 84 / 76%); }
 .western-wheel .planet-node circle { fill: var(--color-surface); }
@@ -1263,7 +1264,7 @@ h1, h2, h3, p { margin-top: 0; }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
-  body::before, body::after, .app-shell--nav::before, .generation-orbit, .landing__geometry .orbit, .landing__geometry .confluence-lens, .landing__geometry::before, .landing__geometry::after, .today-hero__motif, .bazi-wheel__rings, .day-seal { animation: none !important; }
+  body::before, body::after, .app-shell--nav::before, .generation-orbit, .landing__geometry .orbit, .landing__geometry .confluence-lens, .landing__geometry::before, .landing__geometry::after, .today-hero__motif, .map-diagram__image, .map-diagram__core .brand-mark__orbit, .bazi-wheel__rings, .day-seal { animation: none !important; }
 }
 
 @media print {
