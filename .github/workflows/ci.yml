@@ -43,4 +43,4 @@ jobs:
         run: npm run build
 
       - name: Verify production artifact
-        run: node --test tests/bundle-boundaries.test.mjs tests/platform-hardening.test.mjs tests/public-trust-routes.test.mjs tests/rendered-html.test.mjs
+        run: node --experimental-strip-types --test tests/bundle-boundaries.test.mjs tests/platform-hardening.test.mjs tests/public-trust-routes.test.mjs tests/rendered-html.test.mjs
