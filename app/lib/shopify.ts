@@ -78,8 +78,7 @@ function validateCheckoutUrl(value: string) {
   const url = new URL(value);
   const allowed = url.protocol === "https:" && (
     url.hostname === SHOPIFY_STORE.domain ||
-    url.hostname === "checkout.shopify.com" ||
-    url.hostname.endsWith(".myshopify.com")
+    url.hostname === "checkout.shopify.com"
   );
   if (!allowed) throw new Error("Shopify returned an unexpected checkout address");
   return url.toString();

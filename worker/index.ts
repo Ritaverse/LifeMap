@@ -1,16 +1,8 @@
 /** Cloudflare Worker entry point for Life Map. */
-import { handleImageOptimization, DEFAULT_DEVICE_SIZES, DEFAULT_IMAGE_SIZES } from "vinext/server/image-optimization";
 import handler from "vinext/server/app-router-entry";
 
 interface Env {
   ASSETS: Fetcher;
-  IMAGES: {
-    input(stream: ReadableStream): {
-      transform(options: Record<string, unknown>): {
-        output(options: { format: string; quality: number }): Promise<{ response(): Response }>;
-      };
-    };
-  };
 }
 
 interface ExecutionContext {
@@ -18,29 +10,89 @@ interface ExecutionContext {
   passThroughOnException(): void;
 }
 
-// Image security config. SVG sources with .svg extension auto-skip the
-// optimization endpoint on the client side (served directly, no proxy).
-// To route SVGs through the optimizer (with security headers), set
-// dangerouslyAllowSVG: true in next.config.js and uncomment below:
-// const imageConfig: ImageConfig = { dangerouslyAllowSVG: true };
-
 const worker = {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-    const url = new URL(request.url);
-
-    if (url.pathname === "/_vinext/image") {
-      const allowedWidths = [...DEFAULT_DEVICE_SIZES, ...DEFAULT_IMAGE_SIZES];
-      return handleImageOptimization(request, {
-        fetchAsset: (path) => env.ASSETS.fetch(new Request(new URL(path, request.url))),
-        transformImage: async (body, { width, format, quality }) => {
-          const result = await env.IMAGES.input(body).transform(width > 0 ? { width } : {}).output({ format, quality });
-          return result.response();
-        },
-      }, allowedWidths);
-    }
-
-    return handler.fetch(request, env, ctx);
+    const response = await handler.fetch(request, env, ctx);
+    return applyResponseHeaders(request, response);
   },
 };
+
+const PERSONALIZED_ROUTES = [
+  "/onboarding",
+  "/generating",
+  "/today",
+  "/insights",
+  "/life-map",
+  "/ask",
+  "/iching",
+  "/timing",
+  "/report",
+  "/me",
+] as const;
+
+function isPersonalizedRoute(pathname: string) {
+  return PERSONALIZED_ROUTES.some((route) => pathname === route || pathname.startsWith(`${route}/`));
+}
+
+function contentSecurityPolicy(url: URL) {
+  const localDevelopment = url.hostname === "localhost" || url.hostname === "127.0.0.1" || url.hostname === "[::1]";
+  const scriptSources = localDevelopment
+    ? "'self' 'unsafe-inline' 'unsafe-eval'"
+    : "'self' 'unsafe-inline'";
+  const connectSources = [
+    "'self'",
+    "https://geocoding-api.open-meteo.com",
+    "https://dj4xdu-gb.myshopify.com",
+    "https://checkout.shopify.com",
+    ...(localDevelopment ? ["ws:", "wss:"] : []),
+  ].join(" ");
+
+  return [
+    "default-src 'self'",
+    `script-src ${scriptSources}`,
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: blob:",
+    "font-src 'self' data:",
+    `connect-src ${connectSources}`,
+    "media-src 'self'",
+    "worker-src 'self' blob:",
+    "manifest-src 'self'",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "frame-src 'none'",
+    "frame-ancestors 'none'",
+    "form-action 'self' https://dj4xdu-gb.myshopify.com https://checkout.shopify.com",
+    ...(url.protocol === "https:" ? ["upgrade-insecure-requests"] : []),
+  ].join("; ");
+}
+
+function applyResponseHeaders(request: Request, response: Response) {
+  if (response.status === 101) return response;
+
+  const url = new URL(request.url);
+  const headers = new Headers(response.headers);
+  headers.set("Content-Security-Policy", contentSecurityPolicy(url));
+  headers.set("Cross-Origin-Opener-Policy", "same-origin");
+  headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=(), usb=()");
+  headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  headers.set("X-Content-Type-Options", "nosniff");
+  headers.set("X-DNS-Prefetch-Control", "off");
+  headers.set("X-Frame-Options", "DENY");
+
+  if (url.protocol === "https:") {
+    headers.set("Strict-Transport-Security", "max-age=31536000");
+  }
+
+  if (isPersonalizedRoute(url.pathname)) {
+    headers.set("Cache-Control", "private, no-store");
+    headers.set("X-Robots-Tag", "noindex, nofollow, noarchive");
+  }
+
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
 
 export default worker;

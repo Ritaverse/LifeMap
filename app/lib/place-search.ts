@@ -1,5 +1,5 @@
-import { isBirthPlace } from "./bazi.ts";
-import type { BirthPlace } from "./bazi";
+import { isBirthPlace } from "./birth-profile.ts";
+import type { BirthPlace } from "./birth-profile.ts";
 
 const endpoint = "https://geocoding-api.open-meteo.com/v1/search";
 

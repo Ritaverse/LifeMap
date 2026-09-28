@@ -3,10 +3,12 @@
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import type { AnchorHTMLAttributes, FormEvent, ReactNode } from "react";
+import { consumeAskHandoff, writeAskHandoff } from "../lib/ask-handoff";
 import { iching, products, recommendation } from "../lib/data";
-import { calculateBazi, demoBaziReading } from "../lib/bazi";
-import type { BaziPillar, BaziReading, BirthPlace, FiveElement, PillarKind } from "../lib/bazi";
-import { buildCalculatedExperience, getChartExplanationPreview, localDateString, resolveCalculatedEvidence, routeCalculatedAsk } from "../lib/experience";
+import type { BaziPillar, BaziReading, FiveElement, PillarKind } from "../lib/bazi";
+import type { BirthPlace } from "../lib/birth-profile";
+import { localDateString } from "../lib/date";
+import { getChartExplanationPreview, resolveCalculatedEvidence, routeCalculatedAsk } from "../lib/experience-selectors";
 import type { CalculatedExperience, ChartExplanationPreview } from "../lib/experience";
 import { searchBirthPlaces } from "../lib/place-search";
 import { clearBirthProfile, readBirthProfile, readOnboardingDraft, writeBirthProfile, writeOnboardingDraft } from "../lib/profile-storage";
@@ -14,7 +16,8 @@ import type { OnboardingDraft, ReflectionFocus } from "../lib/profile-storage";
 import { clearReflections, readReflections, removeReflection, saveReflection } from "../lib/reflection-storage";
 import type { SavedReflection } from "../lib/reflection-storage";
 import { buildDailyReport, buildLifeMapReport } from "../lib/report";
-import { createReportCheckout, type ReportProductKind } from "../lib/shopify";
+import { classifySafetyConcern } from "../lib/safety";
+import type { SafetyBoundary } from "../lib/safety";
 import type { AskResponse, DomainId, EvidenceRef, IChingLine, Product, SystemId } from "../lib/types";
 import type { WesternReading } from "../lib/western";
 import type { ZiweiReading } from "../lib/ziwei";
@@ -27,6 +30,22 @@ function Link({ href, ...props }: AnchorHTMLAttributes<HTMLAnchorElement> & { hr
 
 function navigate(href: string) {
   window.location.assign(href);
+}
+
+function AskLink({ prompt, focus, children, className }: { prompt?: string; focus?: ReflectionFocus; children: ReactNode; className?: string }) {
+  return (
+    <a
+      href="/ask"
+      className={className}
+      onClick={(event) => {
+        event.preventDefault();
+        writeAskHandoff({ prompt, focus });
+        navigate("/ask");
+      }}
+    >
+      {children}
+    </a>
+  );
 }
 
 const systemLabels: Record<SystemId, { short: string; full: string }> = {
@@ -122,7 +141,7 @@ function PageShell({ route, title, eyebrow, children, backHref }: { route: Route
               {eyebrow && <span>{eyebrow}</span>}
               {title && <strong>{title}</strong>}
             </div>
-            <div className="topbar__actions"><Link href="/me" className="profile-link" aria-label="个人资料">Y</Link></div>
+            <div className="topbar__actions"><Link href="/me" className="profile-link" aria-label="个人资料">我</Link></div>
           </div>
         </header>
       )}
@@ -133,6 +152,12 @@ function PageShell({ route, title, eyebrow, children, backHref }: { route: Route
             <div className="wordmark wordmark--footer"><BrandLockup tagline /></div>
             <p>东方命理 × 西方占星，理解自己，与同路人一起成长。</p>
             <small>COMMUNITY IN THE MAKING · 同路社区正在生长</small>
+            <nav className="site-footer__legal" aria-label="隐私与支持">
+              <Link href="/privacy">隐私</Link>
+              <Link href="/terms">使用条款</Link>
+              <Link href="/digital-delivery">数字交付与退款</Link>
+              <Link href="/support">支持</Link>
+            </nav>
           </div>
         </footer>
       )}
@@ -153,6 +178,46 @@ function PageShell({ route, title, eyebrow, children, backHref }: { route: Route
   );
 }
 
+const profileProtectedRoutes = new Set<RouteName>([
+  "generating",
+  "today",
+  "insight",
+  "life-map",
+  "domain",
+  "ask",
+  "iching",
+  "timing",
+  "report",
+  "me",
+]);
+
+function ProfileGate({ children }: { children: ReactNode }) {
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    if (readBirthProfile()) {
+      queueMicrotask(() => setReady(true));
+      return;
+    }
+    window.location.replace("/onboarding");
+  }, []);
+
+  if (!ready) {
+    return (
+      <div className="app-shell">
+        <main className="main-content main-content--bare">
+          <div className="page state-page profile-gate" role="status" aria-live="polite">
+            <BrandMark large />
+            <p className="eyebrow">PRIVATE SESSION · 本地会话</p>
+            <h1>正在确认你的出生档案</h1>
+            <p>如果当前浏览器没有已完成的出生资料，我们会安全地带你回到创建流程。</p>
+          </div>
+        </main>
+      </div>
+    );
+  }
+  return children;
+}
+
 function SectionHeader({ eyebrow, title, action, href }: { eyebrow?: string; title: string; action?: string; href?: string }) {
   return (
     <div className="section-header">
@@ -162,36 +227,36 @@ function SectionHeader({ eyebrow, title, action, href }: { eyebrow?: string; tit
   );
 }
 
-function useActiveBaziReading() {
-  const [reading, setReading] = useState<BaziReading>(demoBaziReading);
-  useEffect(() => {
-    const profile = readBirthProfile();
-    if (!profile) return;
-    try {
-      const nextReading = calculateBazi(profile);
-      queueMicrotask(() => setReading(nextReading));
-    } catch { /* Keep the safe fictional sample if stored data is invalid. */ }
-  }, []);
-  return reading;
-}
-
 function useActiveExperience() {
-  const reading = useActiveBaziReading();
-  // SSR cannot know the browser's timezone. Start from the UTC calendar date so
-  // the server and first client render agree, then adopt the local day after
-  // hydration. This avoids a date-boundary hydration mismatch.
-  const [targetDate, setTargetDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [targetDate] = useState(() => localDateString());
+  const [state, setState] = useState<{
+    reading: BaziReading | null;
+    experience: CalculatedExperience | null;
+    calculationError: string | null;
+    loading: boolean;
+  }>({ reading: null, experience: null, calculationError: null, loading: true });
+
   useEffect(() => {
-    const localDate = localDateString();
-    if (localDate !== targetDate) queueMicrotask(() => setTargetDate(localDate));
-  }, [targetDate]);
-  return useMemo(() => {
-    try {
-      return { reading, experience: buildCalculatedExperience(reading, targetDate), calculationError: null as string | null };
-    } catch (error) {
-      return { reading, experience: null, calculationError: error instanceof Error ? error.message : "命盘计算失败" };
+    let active = true;
+    const profile = readBirthProfile();
+    if (!profile) {
+      queueMicrotask(() => active && setState({ reading: null, experience: null, calculationError: "未找到当前会话的出生资料。", loading: false }));
+      return () => { active = false; };
     }
-  }, [reading, targetDate]);
+    Promise.all([import("../lib/bazi"), import("../lib/ziwei"), import("../lib/western"), import("../lib/experience")])
+      .then(([baziModule, , , experienceModule]) => {
+        const reading = baziModule.calculateBazi(profile);
+        const experience = experienceModule.buildCalculatedExperience(reading, targetDate);
+        if (active) setState({ reading, experience, calculationError: null, loading: false });
+      })
+      .catch((error: unknown) => {
+        if (active) setState({ reading: null, experience: null, calculationError: error instanceof Error ? error.message : "命盘计算失败", loading: false });
+      });
+    return () => { active = false; };
+  }, [targetDate]);
+  // Every consumer returns its loading/error state while `experience` is null.
+  // Once an experience exists it was built from the same non-null reading.
+  return { ...state, reading: state.reading as BaziReading };
 }
 
 const elementEnglish: Record<FiveElement, string> = { 木: "WOOD", 火: "FIRE", 土: "EARTH", 金: "METAL", 水: "WATER" };
@@ -432,7 +497,7 @@ function ProductVisual({ product, compact = false }: { product: Product; compact
   const style = { "--product-a": product.palette[0], "--product-b": product.palette[1], "--product-c": product.palette[2] } as React.CSSProperties;
   return (
     <div className={`product-visual ${compact ? "product-visual--compact" : ""}`} style={style}>
-      <Image src={product.image.src} alt={product.image.alt} width={1024} height={1024} sizes={compact ? "(max-width: 479px) 100vw, 50vw" : "(max-width: 767px) 100vw, 50vw"} loading={compact ? "lazy" : "eager"} unoptimized />
+      <Image src={product.image.src} alt={product.image.alt} width={768} height={768} loading={compact ? "lazy" : "eager"} unoptimized />
       <span className="product-visual__veil" aria-hidden="true" />
       <small>SYMBOLIC OBJECT · DEMO</small>
     </div>
@@ -448,6 +513,19 @@ function ErrorState({ route, title, message, href, action }: { route: RouteName;
         <h1>{title}</h1>
         <p>{message}</p>
         <Link href={href} className="button button--primary">{action} <span aria-hidden="true">→</span></Link>
+      </div>
+    </PageShell>
+  );
+}
+
+function CalculationLoadingState({ route }: { route: RouteName }) {
+  return (
+    <PageShell route={route} title="本地计算" eyebrow="CALCULATING">
+      <div className="page state-page profile-gate" role="status" aria-live="polite">
+        <BrandMark large />
+        <p className="eyebrow">LOCAL ENGINES · 本地计算</p>
+        <h1>正在展开你的地图</h1>
+        <p>计算引擎按需载入，出生资料仍只保留在当前浏览器会话中。</p>
       </div>
     </PageShell>
   );
@@ -578,6 +656,7 @@ function OnboardingPage() {
   const [step, setStep] = useState(0);
   const [form, setForm] = useState<OnboardingDraft>(defaultOnboardingDraft);
   const [error, setError] = useState("");
+  const [calculating, setCalculating] = useState(false);
   const current = onboardingSteps[step];
 
   useEffect(() => {
@@ -599,14 +678,15 @@ function OnboardingPage() {
     return true;
   }, [current.id, form]);
 
-  const next = () => {
-    if (!valid) return;
+  const next = async () => {
+    if (!valid || calculating) return;
     if (step === onboardingSteps.length - 1) {
       if (!form.selectedPlace) {
         setError("请先搜索并选择一个真实出生地点。");
         return;
       }
       try {
+        setCalculating(true);
         const profile = {
           displayName: form.name.trim() || "你",
           birthDate: form.date,
@@ -615,13 +695,15 @@ function OnboardingPage() {
           birthPlace: form.selectedPlace,
           traditionalGender: form.gender,
         };
-        const bazi = calculateBazi(profile);
-        buildCalculatedExperience(bazi, localDateString());
+        const [baziModule, , , experienceModule] = await Promise.all([import("../lib/bazi"), import("../lib/ziwei"), import("../lib/western"), import("../lib/experience")]);
+        const bazi = baziModule.calculateBazi(profile);
+        experienceModule.buildCalculatedExperience(bazi, localDateString());
         writeBirthProfile(profile);
         sessionStorage.setItem("life-map-focus", form.focus);
         sessionStorage.setItem("life-map-complete", "true");
         navigate("/generating");
       } catch {
+        setCalculating(false);
         setError("这组出生资料暂时无法计算，请返回检查日期、时间和地点。");
       }
     } else setStep((value) => value + 1);
@@ -653,7 +735,7 @@ function OnboardingPage() {
             </div>}
           </div>
           {error && <p className="inline-notice" role="alert">{error}</p>}
-          <div className="onboarding__actions"><button className="button button--secondary" onClick={() => step === 0 ? navigate("/") : setStep((value) => value - 1)}>返回</button><button className="button button--primary" disabled={!valid} onClick={next}>{step === onboardingSteps.length - 1 ? "生成我的人生地图" : "继续"} <span aria-hidden="true">→</span></button></div>
+          <div className="onboarding__actions"><button className="button button--secondary" disabled={calculating} onClick={() => step === 0 ? navigate("/") : setStep((value) => value - 1)}>返回</button><button className="button button--primary" disabled={!valid || calculating} onClick={next}>{calculating ? "正在验证计算…" : step === onboardingSteps.length - 1 ? "生成我的人生地图" : "继续"} <span aria-hidden="true">→</span></button></div>
         </section>
         <p className="onboarding__privacy">你的出生信息是敏感数据。本次计算只保存在当前浏览器会话中。</p>
       </div>
@@ -664,7 +746,7 @@ function OnboardingPage() {
 const generationStages = ["正在验证出生资料与历史时区", "正在按节气排列四柱", "正在展开紫微十二宫", "正在定位出生时的行星与宫位", "正在连接可追溯的综合证据"];
 
 function GeneratingPage() {
-  const { reading, experience, calculationError } = useActiveExperience();
+  const { reading, experience, calculationError, loading } = useActiveExperience();
   const [active, setActive] = useState(0);
   const [done, setDone] = useState(false);
   useEffect(() => {
@@ -675,6 +757,7 @@ function GeneratingPage() {
     }), reduced ? 180 : 620);
     return () => window.clearInterval(interval);
   }, []);
+  if (loading) return <CalculationLoadingState route="generating" />;
   if (!experience) return <ErrorState route="generating" title="这组资料暂时无法完整排盘" message={calculationError ?? "请返回检查出生日期、时间和地点。"} href="/onboarding" action="返回检查资料" />;
   return (
     <PageShell route="generating">
@@ -699,11 +782,11 @@ function ReportOffer({ compact = false }: { compact?: boolean }) {
     <section className={`report-offer ${compact ? "report-offer--compact" : ""}`}>
       <div className="report-offer__folio" aria-hidden="true"><span>1·10</span><i /><i /><i /></div>
       <div>
-        <p className="eyebrow">PRIVATE PDF · 两种一次性报告</p>
-        <h2>今天的一页，或十页完整地图</h2>
-        <p>Daily Report 聚焦今天；Detailed Report 整理八字、紫微、西占、当前时运、证据综合与七日练习。两种报告都先预览、再一次性购买。</p>
-        <div className="report-offer__meta"><strong>DAILY · $1.99</strong><strong>10 PAGES · $19.99</strong><span>本地生成</span></div>
-        <Link href="/report" className="button button--primary">比较两种报告 <span aria-hidden="true">→</span></Link>
+        <p className="eyebrow">PRIVATE PDF · PUBLIC BETA PREVIEW</p>
+        <h2>先看一页与十页报告结构</h2>
+        <p>Daily Report 聚焦今天；Detailed Report 整理八字、紫微、西占、当前时运、证据综合与七日练习。公开测试阶段只开放本地预览，不收取付款。</p>
+        <div className="report-offer__meta"><strong>DAILY · PREVIEW</strong><strong>10 PAGES · PREVIEW</strong><span>购买暂未开放</span></div>
+        <Link href="/report" className="button button--primary">查看免费报告预览 <span aria-hidden="true">→</span></Link>
       </div>
     </section>
   );
@@ -719,9 +802,10 @@ function ReflectionThreadCard({ reflection }: { reflection: SavedReflection }) {
 }
 
 function TodayPage() {
-  const { reading, experience, calculationError } = useActiveExperience();
+  const { reading, experience, calculationError, loading } = useActiveExperience();
   const { items: reflections } = useSavedReflections();
   const preferredFocus = useSessionFocus();
+  if (loading) return <CalculationLoadingState route="today" />;
   if (!experience) return <ErrorState route="today" title="今天的地图无法完成计算" message={calculationError ?? "请检查出生资料。"} href="/onboarding" action="检查出生资料" />;
   const today = experience.todayInsight;
   const featured = products.find((product) => product.id === recommendation.productId) ?? products[0];
@@ -747,7 +831,7 @@ function TodayPage() {
         <section className="section-block">
           <SectionHeader eyebrow="REFLECT" title={latestReflection ? "继续，或开始一个新问题" : "从一个现实问题开始"} />
           <div className="quick-grid">
-            <Link href={`/ask?focus=${preferredFocus}`} className="quick-card"><span className="quick-card__motif quick-card__motif--ask" aria-hidden="true" /><small>DECISION SESSION</small><h3>梳理{preferred.label}问题</h3><p>{preferred.description}</p><b aria-hidden="true">→</b></Link>
+            <AskLink focus={preferredFocus} className="quick-card"><span className="quick-card__motif quick-card__motif--ask" aria-hidden="true" /><small>DECISION SESSION</small><h3>梳理{preferred.label}问题</h3><p>{preferred.description}</p><b aria-hidden="true">→</b></AskLink>
             <Link href="/iching" className="quick-card quick-card--cinnabar"><span className="quick-card__motif quick-card__motif--iching" aria-hidden="true" /><small>I CHING</small><h3>问一卦</h3><p>为此刻的具体问题留出空间</p><b aria-hidden="true">→</b></Link>
           </div>
         </section>
@@ -769,7 +853,8 @@ function TodayPage() {
 }
 
 function InsightPage({ id }: { id?: string }) {
-  const { experience, calculationError } = useActiveExperience();
+  const { experience, calculationError, loading } = useActiveExperience();
+  if (loading) return <CalculationLoadingState route="insight" />;
   if (!experience) return <ErrorState route="insight" title="洞察证据无法完成计算" message={calculationError ?? "请检查出生资料。"} href="/onboarding" action="检查出生资料" />;
   const insight = id === experience.todayInsight.id || !id ? experience.todayInsight : Object.values(experience.domainInsights).find((item) => item.id === id);
   if (!insight) return <ErrorState route="insight" title="没有找到这个洞察" message="这个计算洞察链接不存在，或已经由新版规则替换。" href="/today" action="回到今日" />;
@@ -780,7 +865,7 @@ function InsightPage({ id }: { id?: string }) {
         <section className="reading-section"><span className="section-number">01</span><SectionHeader title="综合解释" eyebrow="SYNTHESIS" /><p className="reading-copy">{insight.kind === "consensus" ? "这一主题在两个以上体系中出现，但每个体系提供了不同角度。共同点不是结果预测，而是此刻值得观察的方向。" : "不同体系在这里保留了有意义的张力；我们不会把它们平均成一个分数。"}</p></section>
         <section className="reading-section"><span className="section-number">02</span><SectionHeader title="依据来自哪里" eyebrow="EVIDENCE" /><EvidenceList evidence={insight.evidence} experience={experience} /></section>
         {insight.tensionNote && <section className="tension-card"><p className="eyebrow">TENSION · 张力</p><h2>不需要急着消除的矛盾</h2><p>{insight.tensionNote}</p></section>}
-        <section className="reflection-card"><span aria-hidden="true">问</span><div><p className="eyebrow">REFLECTION PROMPT</p><h2>{insight.reflectionPrompt}</h2><Link href={`/ask?prompt=${encodeURIComponent(insight.reflectionPrompt)}`} className="button button--primary">和命盘继续聊 <span>→</span></Link></div></section>
+        <section className="reflection-card"><span aria-hidden="true">问</span><div><p className="eyebrow">REFLECTION PROMPT</p><h2>{insight.reflectionPrompt}</h2><AskLink prompt={insight.reflectionPrompt} className="button button--primary">和命盘继续聊 <span>→</span></AskLink></div></section>
         <p className="disclosure disclosure--center">命盘事实来自版本化本地引擎；综合文字来自规则模板，用于反思，不是实时 AI 或科学预测。</p>
       </div>
     </PageShell>
@@ -788,7 +873,8 @@ function InsightPage({ id }: { id?: string }) {
 }
 
 function LifeMapPage() {
-  const { reading, experience, calculationError } = useActiveExperience();
+  const { reading, experience, calculationError, loading } = useActiveExperience();
+  if (loading) return <CalculationLoadingState route="life-map" />;
   if (!experience) return <ErrorState route="life-map" title="命盘无法完成计算" message={calculationError ?? "请检查出生资料。"} href="/onboarding" action="检查出生资料" />;
   const identity = experience.domainInsights.identity;
   const chartExplanations = {
@@ -831,7 +917,8 @@ function LifeMapPage() {
 }
 
 function DomainPage({ id }: { id?: string }) {
-  const { experience, calculationError } = useActiveExperience();
+  const { experience, calculationError, loading } = useActiveExperience();
+  if (loading) return <CalculationLoadingState route="domain" />;
   if (!experience) return <ErrorState route="domain" title="生命领域无法完成计算" message={calculationError ?? "请检查出生资料。"} href="/onboarding" action="检查出生资料" />;
   const domain = experience.domains.find((item) => item.id === (id ?? "career"));
   if (!domain) return <ErrorState route="domain" title="没有找到这个生命领域" message="这个领域不存在。你可以回到 Life Map 查看八个可用领域。" href="/life-map" action="查看 Life Map" />;
@@ -843,39 +930,47 @@ function DomainPage({ id }: { id?: string }) {
         <section className="calculation-coverage"><div><p className="eyebrow">CALCULATION COVERAGE</p><h2>本领域用了哪些真实事实</h2><p>数量只表示证据来源覆盖，不是置信度或命运评分。</p></div>{(["bazi", "ziwei", "astrology"] as SystemId[]).map((system) => <article key={system}><span className={`system-seal system-seal--${system}`}>{systemLabels[system].short.slice(0, 1)}</span><div><b>{systemLabels[system].full}</b><small>{insight.evidence.some((item) => item.system === system) ? "已连接计算事实" : "此领域没有可用事实"}</small></div></article>)}</section>
         <section className="reading-section"><SectionHeader eyebrow="MULTI-SYSTEM READING" title="三个体系如何描述它" /><p className="reading-copy">这不是把三个传统相加成一个结论，而是让每条线索保留自己的来源与语言，再观察它们在哪里相遇。</p><EvidenceList evidence={insight.evidence} experience={experience} /></section>
         {insight.tensionNote && <section className="tension-card"><p className="eyebrow">A USEFUL TENSION</p><h2>值得保留的张力</h2><p>{insight.tensionNote}</p></section>}
-        <section className="reflection-card"><span aria-hidden="true">问</span><div><p className="eyebrow">TAKE THIS WITH YOU</p><h2>{insight.reflectionPrompt}</h2><Link href={`/ask?prompt=${encodeURIComponent(insight.reflectionPrompt)}`} className="button button--primary">问一个{domain.nameZh}问题 <span>→</span></Link></div></section>
+        <section className="reflection-card"><span aria-hidden="true">问</span><div><p className="eyebrow">TAKE THIS WITH YOU</p><h2>{insight.reflectionPrompt}</h2><AskLink prompt={insight.reflectionPrompt} className="button button--primary">问一个{domain.nameZh}问题 <span>→</span></AskLink></div></section>
       </div>
     </PageShell>
   );
 }
 
 function AskPage() {
-  const { experience, calculationError } = useActiveExperience();
+  const { experience, calculationError, loading } = useActiveExperience();
   const [focus, setFocus] = useState<ReflectionFocus>("relationships");
   const [question, setQuestion] = useState("");
   const [options, setOptions] = useState("");
   const [concern, setConcern] = useState("");
   const [deadline, setDeadline] = useState("");
   const [answer, setAnswer] = useState<AskResponse | null>(null);
+  const [safetyBoundary, setSafetyBoundary] = useState<SafetyBoundary | null>(null);
   useEffect(() => {
     if (!experience) return;
-    const params = new URLSearchParams(window.location.search);
-    const prompt = params.get("prompt");
-    const routedFocus = params.get("focus");
+    const handoff = consumeAskHandoff();
     queueMicrotask(() => {
-      if (focusOptions.some((item) => item.id === routedFocus)) setFocus(routedFocus as ReflectionFocus);
-      if (prompt) setQuestion(prompt);
+      if (handoff?.focus) setFocus(handoff.focus);
+      if (handoff?.prompt) setQuestion(handoff.prompt);
     });
   }, [experience]);
+  if (loading) return <CalculationLoadingState route="ask" />;
   if (!experience) return <ErrorState route="ask" title="问命盘需要先完成计算" message={calculationError ?? "请检查出生资料。"} href="/onboarding" action="检查出生资料" />;
   const submit = (event: FormEvent) => {
     event.preventDefault();
     if (!question.trim()) return;
+    const boundary = classifySafetyConcern([question, options, concern].filter(Boolean).join(" "));
+    if (boundary) {
+      setAnswer(null);
+      setSafetyBoundary(boundary);
+      return;
+    }
     const routedQuestion = `${focusOption(focus).label}：${question}`;
+    setSafetyBoundary(null);
     setAnswer(routeCalculatedAsk(routedQuestion, experience, focusDomains[focus]));
   };
   const reset = () => {
     setAnswer(null);
+    setSafetyBoundary(null);
     setQuestion("");
     setOptions("");
     setConcern("");
@@ -883,8 +978,8 @@ function AskPage() {
   };
   return (
     <PageShell route="ask">
-      <div className={`page ask-page ${answer ? "ask-page--answered" : ""}`}>
-        {!answer ? <>
+      <div className={`page ask-page ${answer || safetyBoundary ? "ask-page--answered" : ""}`}>
+        {safetyBoundary ? <SafetyNotice boundary={safetyBoundary} onReset={reset} /> : !answer ? <>
           <header className="ask-hero"><div className="ask-orbit" aria-hidden="true"><span>问</span></div><p className="eyebrow">DECISION SESSION · 决策反思</p><h1>先把问题<br />说具体一点</h1><p>Life Map 不替你选择。它会把现实问题与已计算事实并置，指出共识、张力和一个可以验证的小步骤。</p><span className="fixture-label">CALCULATED · 规则综合，不调用实时 AI</span></header>
           <form className="decision-form" onSubmit={submit}>
             <fieldset className="decision-focus"><legend>这次主要关于</legend>{focusOptions.map((option) => <label key={option.id} className={focus === option.id ? "is-selected" : ""}><input type="radio" name="focus" value={option.id} checked={focus === option.id} onChange={() => setFocus(option.id)} /><span>{option.label}</span></label>)}</fieldset>
@@ -900,6 +995,22 @@ function AskPage() {
         </> : <AskAnswer answer={answer} question={question} options={options} concern={concern} deadline={deadline} focus={focus} experience={experience} onReset={reset} />}
       </div>
     </PageShell>
+  );
+}
+
+function SafetyNotice({ boundary, onReset }: { boundary: SafetyBoundary; onReset: () => void }) {
+  return (
+    <article className={`safety-notice ${boundary.urgent ? "safety-notice--urgent" : ""}`} role={boundary.urgent ? "alert" : "status"}>
+      <p className="eyebrow">{boundary.eyebrow}</p>
+      <h1>{boundary.title}</h1>
+      <p>{boundary.message}</p>
+      <ul>{boundary.nextSteps.map((step) => <li key={step}>{step}</li>)}</ul>
+      <div className="safety-notice__actions">
+        <button className="button button--primary" type="button" onClick={onReset}>换一个反思问题</button>
+        <Link className="button button--secondary" href="/support">查看支持与产品边界</Link>
+      </div>
+      <small>Life Map 不会根据命盘、卦象或星盘给出高风险专业判断。</small>
+    </article>
   );
 }
 
@@ -944,20 +1055,33 @@ function IChingPage() {
   const [question, setQuestion] = useState(iching.sampleQuestion);
   const [started, setStarted] = useState(false);
   const [casts, setCasts] = useState(0);
-  const cast = () => { setStarted(true); setCasts((value) => Math.min(6, value + 1)); };
-  const reset = () => { setCasts(0); setStarted(false); };
+  const [safetyBoundary, setSafetyBoundary] = useState<SafetyBoundary | null>(null);
+  const cast = () => {
+    if (!started) {
+      const boundary = classifySafetyConcern(question);
+      if (boundary) {
+        setSafetyBoundary(boundary);
+        return;
+      }
+    }
+    setSafetyBoundary(null);
+    setStarted(true);
+    setCasts((value) => Math.min(6, value + 1));
+  };
+  const reset = () => { setQuestion(""); setCasts(0); setStarted(false); setSafetyBoundary(null); };
   return (
     <PageShell route="iching" title="问一卦 / I Ching" eyebrow="REFLECTION RITUAL" backHref="/ask">
       <div className="page iching-page">
-        {!started ? <section className="iching-intro"><div className="iching-mark" aria-hidden="true"><i /><i /><i /><i /><i /><i /></div><p className="eyebrow">A QUESTION FOR THIS MOMENT</p><h1>先把问题<br />放在心里</h1><p>易经在这里是一种为具体问题留出空间的传统反思实践。它不会替你预测或保证结果。</p><label className="field field--textarea"><span>你想问什么？</span><textarea value={question} onChange={(event) => setQuestion(event.target.value)} rows={3} /></label><button className="button button--primary" disabled={!question.trim()} onClick={cast}>开始投掷 <span>→</span></button></section> : casts < 6 ? <section className="casting"><p className="eyebrow">BUILDING FROM THE BOTTOM · 从下往上</p><h1>第 {casts + 1} 次，共 6 次</h1><p className="casting__question">“{question}”</p><div className="cast-stage"><Hexagram lines={iching.lines} count={casts} /><div className="coins" aria-hidden="true"><span>阴</span><span>阳</span><span>阴</span></div></div><button className="button button--primary" onClick={cast}>投掷三枚硬币</button><button className="text-button" onClick={() => setCasts(6)}>直接查看演示结果</button></section> : <section className="iching-result"><header><div><p className="eyebrow">HEXAGRAM 63 · 演示结果</p><h1>{iching.primary.nameZh}</h1><h2>{iching.primary.nameEn}</h2></div><Hexagram lines={iching.lines} /></header><div className="result-transition"><span>{iching.primary.nameZh} · 63</span><i>六二动爻 →</i><span>{iching.relating?.nameZh} · 05</span></div><section><p className="eyebrow">ORIGINAL TEXT · {iching.originalTextLabel}</p><blockquote>{iching.originalTextExcerpt}</blockquote></section><section><p className="eyebrow">PLAIN LANGUAGE · 白话理解</p><h2>已经开始，不必急着补齐一切</h2><p>{iching.plainLanguage}</p></section><section className="application-card"><p className="eyebrow">APPLIED TO YOUR QUESTION</p><h2>放回你的问题里</h2><p>{iching.applicationToQuestion}</p></section><section className="answer-reflection"><p className="eyebrow">REFLECTION</p><h2>{iching.reflectionPrompt}</h2></section><div className="result-actions"><Link href={`/ask?prompt=${encodeURIComponent(`结合命盘看：${question}`)}`} className="button button--primary">结合我的命盘一起看</Link><button className="button button--secondary" onClick={reset}>重新起卦</button></div><p className="disclosure disclosure--center">{iching.disclaimer}</p></section>}
+        {safetyBoundary ? <SafetyNotice boundary={safetyBoundary} onReset={reset} /> : !started ? <section className="iching-intro"><div className="iching-mark" aria-hidden="true"><i /><i /><i /><i /><i /><i /></div><p className="eyebrow">A QUESTION FOR THIS MOMENT</p><h1>先把问题<br />放在心里</h1><p>易经在这里是一种为具体问题留出空间的传统反思实践。它不会替你预测或保证结果。</p><label className="field field--textarea"><span>你想问什么？</span><textarea value={question} onChange={(event) => setQuestion(event.target.value)} rows={3} /></label><button className="button button--primary" disabled={!question.trim()} onClick={cast}>开始投掷 <span>→</span></button></section> : casts < 6 ? <section className="casting"><p className="eyebrow">BUILDING FROM THE BOTTOM · 从下往上</p><h1>第 {casts + 1} 次，共 6 次</h1><p className="casting__question">“{question}”</p><div className="cast-stage"><Hexagram lines={iching.lines} count={casts} /><div className="coins" aria-hidden="true"><span>阴</span><span>阳</span><span>阴</span></div></div><button className="button button--primary" onClick={cast}>投掷三枚硬币</button><button className="text-button" onClick={() => setCasts(6)}>直接查看演示结果</button></section> : <section className="iching-result"><header><div><p className="eyebrow">HEXAGRAM 63 · 演示结果</p><h1>{iching.primary.nameZh}</h1><h2>{iching.primary.nameEn}</h2></div><Hexagram lines={iching.lines} /></header><div className="result-transition"><span>{iching.primary.nameZh} · 63</span><i>六二动爻 →</i><span>{iching.relating?.nameZh} · 05</span></div><section><p className="eyebrow">ORIGINAL TEXT · {iching.originalTextLabel}</p><blockquote>{iching.originalTextExcerpt}</blockquote></section><section><p className="eyebrow">PLAIN LANGUAGE · 白话理解</p><h2>已经开始，不必急着补齐一切</h2><p>{iching.plainLanguage}</p></section><section className="application-card"><p className="eyebrow">APPLIED TO YOUR QUESTION</p><h2>放回你的问题里</h2><p>{iching.applicationToQuestion}</p></section><section className="answer-reflection"><p className="eyebrow">REFLECTION</p><h2>{iching.reflectionPrompt}</h2></section><div className="result-actions"><AskLink prompt={`结合命盘看：${question}`} className="button button--primary">结合我的命盘一起看</AskLink><button className="button button--secondary" onClick={reset}>重新起卦</button></div><p className="disclosure disclosure--center">{iching.disclaimer}</p></section>}
       </div>
     </PageShell>
   );
 }
 
 function TimingPage() {
-  const { experience, calculationError } = useActiveExperience();
+  const { experience, calculationError, loading } = useActiveExperience();
   const { items: reflections } = useSavedReflections();
+  if (loading) return <CalculationLoadingState route="timing" />;
   if (!experience) return <ErrorState route="timing" title="当前时运无法完成计算" message={calculationError ?? "请检查出生资料。"} href="/onboarding" action="检查出生资料" />;
   const timing = experience.timing;
   const datedReflection = reflections.find((item) => item.deadline || item.reviewDate);
@@ -969,82 +1093,62 @@ function TimingPage() {
         {datedReflection && <section className="decision-date-card"><p className="eyebrow">YOUR REAL-WORLD DATE · 你的现实时间</p><h2>{datedReflection.question}</h2><p>{datedReflection.deadline ? `你计划在 ${datedReflection.deadline} 前做决定。` : "你还没有设置决定期限。"} {datedReflection.reviewDate ? `复盘日期是 ${datedReflection.reviewDate}。` : ""}</p><small>现实日期来自你保存的问题，不是命盘预测或“吉日”。</small></section>}
         <section className="section-block"><SectionHeader eyebrow="DOMAIN ACTIVATION · 已计算" title="哪些主题留下较多线索" /><div className="signal-list">{timing.signals.map((signal, index) => <article key={signal.id}><div><span>{signal.label}</span><small>{signal.strength === "very-active" ? "多源线索" : signal.strength === "active" ? "可见线索" : "背景线索"}</small></div><i><b style={{ "--signal-width": `${signal.internalStrength * 100}%`, "--signal-delay": `${index * 90}ms` } as React.CSSProperties} /></i><p>{signal.summary}</p></article>)}</div><p className="inline-notice">{timing.disclaimer}</p></section>
         <section className="reading-section"><SectionHeader eyebrow={`AS OF ${timing.asOf}`} title="时运依据来自哪里" /><EvidenceList evidence={timing.evidence} experience={experience} /></section>
-        <section className="reflection-card"><span aria-hidden="true">时</span><div><p className="eyebrow">THIS PERIOD&apos;S PRACTICE</p><h2>{experience.todayInsight.reflectionPrompt}</h2><Link href={`/ask?prompt=${encodeURIComponent("这个阶段我最值得留意什么？")}`} className="button button--primary">围绕当前阶段提问</Link></div></section>
+        <section className="reflection-card"><span aria-hidden="true">时</span><div><p className="eyebrow">THIS PERIOD&apos;S PRACTICE</p><h2>{experience.todayInsight.reflectionPrompt}</h2><AskLink prompt="这个阶段我最值得留意什么？" focus="timing" className="button button--primary">围绕当前阶段提问</AskLink></div></section>
       </div>
     </PageShell>
   );
 }
 
 function ReportPage() {
-  const { reading, experience, calculationError } = useActiveExperience();
+  const { reading, experience, calculationError, loading } = useActiveExperience();
   const dailyReport = useMemo(() => experience ? buildDailyReport(experience, experience.calculatedFor) : null, [experience]);
   const detailedReport = useMemo(() => experience ? buildLifeMapReport(experience, experience.calculatedFor) : null, [experience]);
-  const [checkoutState, setCheckoutState] = useState<{ status: "idle" | "loading" | "error"; kind: ReportProductKind | null }>({ status: "idle", kind: null });
-  const [checkoutMessage, setCheckoutMessage] = useState("");
-  const storefrontConfigured = Boolean(process.env.NEXT_PUBLIC_SHOPIFY_STOREFRONT_TOKEN?.trim());
 
+  if (loading) return <CalculationLoadingState route="report" />;
   if (!experience || !dailyReport || !detailedReport) return <ErrorState route="report" title="数字报告无法生成" message={calculationError ?? "请检查出生资料。"} href="/onboarding" action="检查出生资料" />;
   const dailyPage = dailyReport.pages[0];
   const previewPages = detailedReport.pages.filter((page) => [1, 7, 9].includes(page.number));
-
-  const beginCheckout = async (kind: ReportProductKind) => {
-    setCheckoutState({ status: "loading", kind });
-    setCheckoutMessage("");
-    try {
-      const checkout = await createReportCheckout(kind);
-      sessionStorage.setItem("life-map-report-checkout-started", JSON.stringify({ product: checkout.kind, amount: checkout.amount, currency: checkout.currencyCode }));
-      window.location.assign(checkout.checkoutUrl);
-    } catch (error) {
-      setCheckoutState({ status: "error", kind });
-      setCheckoutMessage(error instanceof Error ? error.message : "暂时无法连接 Shopify 结账，请稍后重试。");
-    }
-  };
 
   return (
     <PageShell route="report" title="数字报告" eyebrow="PRIVATE PDF" backHref="/today">
       <div className="page report-page">
         <header className="report-intro">
           <div>
-            <p className="eyebrow">PRIVATE EDITIONS · 一次性购买</p>
-            <h1>先选深度，<br />再进入结账</h1>
-            <p>Daily Report 用一页回答“今天值得留意什么”；Detailed Report 用十页整理完整命盘、当期线索和可追溯依据。没有试用转订阅，也没有自动续费。</p>
+            <p className="eyebrow">PRIVATE EDITIONS · PUBLIC BETA</p>
+            <h1>先看报告，<br />暂不进入结账</h1>
+            <p>Daily Report 用一页回答“今天值得留意什么”；Detailed Report 用十页整理完整命盘、当期线索和可追溯依据。公开测试阶段只开放预览与本地打印，购买将在安全交付完成后开放。</p>
             <div className="report-intro__actions">
               <button className="button button--secondary" type="button" onClick={() => window.print()}>保存本地预览</button>
               <a className="button button--tertiary" href="/downloads/life-map-full-daily-report-sample.pdf" download>下载十页演示 PDF</a>
             </div>
-            <p className="report-privacy">两种都是一次性数字商品。你可以先查看下方预览，免费命盘事实与证据不会被报告付费墙锁住。</p>
+            <p className="report-privacy">当前不会创建 Shopify 订单或收取付款。免费命盘事实与证据不会被报告付费墙锁住。</p>
           </div>
         </header>
 
         <section className="report-selector" aria-labelledby="report-selector-title">
-          <div className="report-selector__heading"><p className="eyebrow">CHOOSE YOUR DEPTH · 选择阅读深度</p><h2 id="report-selector-title">两份报告，各自解决什么</h2><p>价格、页数和内容在点击结账前全部说明；购买不会解锁原本免费的命盘计算。</p></div>
+          <div className="report-selector__heading"><p className="eyebrow">COMPARE THE FORMATS · 比较阅读深度</p><h2 id="report-selector-title">两份报告，各自解决什么</h2><p>这是内容与版式预览。公开测试期间购买按钮保持停用，直到付款验证、私人 PDF 交付与退款流程完成端到端测试。</p></div>
           <div className="report-tier-grid">
             <article className="report-tier-card report-tier-card--daily">
               <header><span>DAILY · 1 PAGE</span><small>适合今天</small></header>
               <h3>Daily Report</h3>
               <p>一页读完今天的综合主题、当前时运与可验证的小行动。</p>
-              <div className="report-tier-card__price"><strong>$1.99</strong><span>USD · 一次性购买</span></div>
+              <div className="report-tier-card__price"><strong>Preview</strong><span>公开测试 · 暂不出售</span></div>
               <ul><li>今日综合主题与时间范围</li><li>最多 3 条可溯源命盘依据</li><li>1 个现实观察与反思提示</li><li>私人一页 PDF</li></ul>
-              <button className="button button--primary" type="button" onClick={() => beginCheckout("daily")} disabled={checkoutState.status === "loading"}>
-                {checkoutState.status === "loading" && checkoutState.kind === "daily" ? "正在连接 Shopify…" : "购买 Daily Report · $1.99"}
-              </button>
+              <button className="button button--primary" type="button" disabled>购买尚未开放</button>
               <a href="#daily-preview" className="text-link">先看一页预览 ↓</a>
             </article>
             <article className="report-tier-card report-tier-card--detailed">
               <header><span>DETAILED · 10 PAGES</span><small>适合保存与复盘</small></header>
               <h3>Detailed Report</h3>
               <p>把三套本命计算、当前时运、规则综合和七日练习整理成完整档案。</p>
-              <div className="report-tier-card__price"><strong>$19.99</strong><span>USD · 一次性购买</span></div>
+              <div className="report-tier-card__price"><strong>Preview</strong><span>公开测试 · 暂不出售</span></div>
               <ul><li>八字、紫微与西占计算记录</li><li>跨体系共识、张力与证据</li><li>八个生命领域的反思主题</li><li>七日练习、方法与限制</li></ul>
-              <button className="button button--secondary" type="button" onClick={() => beginCheckout("detailed")} disabled={checkoutState.status === "loading"}>
-                {checkoutState.status === "loading" && checkoutState.kind === "detailed" ? "正在连接 Shopify…" : "购买 10 页 Detailed Report · $19.99"}
-              </button>
+              <button className="button button--secondary" type="button" disabled>购买尚未开放</button>
               <a href="#detailed-preview" className="text-link">查看目录与章节预览 ↓</a>
             </article>
           </div>
-          <p className="report-checkout-note">安全结账由 Shopify 提供。订单只包含所选商品、数量和价格；姓名、生日、出生时间、地点与命盘内容不会发送给 Shopify。</p>
-          {!storefrontConfigured && <p className="inline-notice">商店目前使用受保护的预览模式；Shopify 可能先显示店铺密码页。正式上线前需在 Shopify 后台解除 Online Store 密码，或配置公开 Storefront token。</p>}
-          {checkoutState.status === "error" && <p className="inline-notice" role="alert">{checkoutMessage}</p>}
+          <p className="report-checkout-note">公开测试阶段不会连接 Shopify 结账，也不会把姓名、生日、出生时间、地点、问题或命盘内容发送给 Shopify。</p>
+          <p className="inline-notice">BETA SAFETY · 购买暂时关闭。只有完成付款验证、个性化 PDF 交付、下载恢复与退款测试后才会重新开放。</p>
         </section>
 
         <div className="report-boundary"><span>FACT</span><p>命盘事实来自版本化引擎</p><span>REFLECTION</span><p>传统主题是可质疑的观察角度</p><span>PRACTICE</span><p>练习不需要购买任何物品</p></div>
@@ -1076,7 +1180,7 @@ function ReportPage() {
             </article>
           ))}
         </section>
-        <section className="report-final-cta"><p className="eyebrow">ONE-TIME PURCHASE · NO SUBSCRIPTION</p><h2>选择今天的一页，或完整十页</h2><p>{detailedReport.disclaimer} 两种报告均为一次性购买，不会自动续费。</p><div className="report-final-cta__actions"><button className="button button--primary" type="button" onClick={() => beginCheckout("daily")} disabled={checkoutState.status === "loading"}>Daily · $1.99</button><button className="button button--secondary" type="button" onClick={() => beginCheckout("detailed")} disabled={checkoutState.status === "loading"}>Detailed · $19.99</button></div></section>
+        <section className="report-final-cta"><p className="eyebrow">PUBLIC BETA · PREVIEW ONLY</p><h2>先保存预览，购买稍后开放</h2><p>{detailedReport.disclaimer} 当前不会收款、创建订单或自动续费。</p><div className="report-final-cta__actions"><button className="button button--primary" type="button" disabled>Daily · 暂未开放</button><button className="button button--secondary" type="button" disabled>Detailed · 暂未开放</button></div><Link href="/digital-delivery" className="text-link">查看未来的数字交付与退款边界 →</Link></section>
       </div>
     </PageShell>
   );
@@ -1112,8 +1216,9 @@ function ProductPage({ id }: { id?: string }) {
 }
 
 function MePage() {
-  const { reading, experience, calculationError } = useActiveExperience();
+  const { reading, experience, calculationError, loading } = useActiveExperience();
   const { items: reflections, setItems: setReflections } = useSavedReflections();
+  if (loading) return <CalculationLoadingState route="me" />;
   if (!experience) return <ErrorState route="me" title="出生档案无法完成计算" message={calculationError ?? "请检查出生资料。"} href="/onboarding" action="检查出生资料" />;
   const clearProfile = () => {
     clearBirthProfile();
@@ -1127,7 +1232,7 @@ function MePage() {
         <section className="profile-card"><SectionHeader eyebrow="BIRTH PROFILE" title="出生信息" /><dl><div><dt>出生日期</dt><dd>{reading.profile.birthDate}</dd></div><div><dt>出生时间</dt><dd>{reading.profile.birthTime ?? "未知"}</dd></div><div><dt>出生地点</dt><dd>{reading.place.label}</dd></div><div><dt>时区</dt><dd>{reading.place.timeZone}</dd></div><div><dt>状态</dt><dd><span className="calculation-label">三体系计算完成</span></dd></div></dl><Link href="/onboarding" className="text-link">重新输入资料 →</Link></section>
         <section className="reflection-history" id="reflection-history"><SectionHeader eyebrow="YOUR THREADS" title="问题与行动" action={reflections.length ? `${reflections.length} 条记录` : undefined} />{reflections.length ? <div>{reflections.map((reflection) => <article key={reflection.id}><span>{focusOption(reflection.focus).label}</span><div><h3>{reflection.question}</h3><p>{reflection.action}</p><small>{reflection.reviewDate ? `计划复盘 ${reflection.reviewDate}` : "未设置复盘日期"}</small></div><button type="button" aria-label={`删除问题：${reflection.question}`} onClick={() => setReflections(removeReflection(reflection.id))}>删除</button></article>)}</div> : <div className="empty-thread"><p>还没有保存问题。完成一次决策反思后，你的行动和复盘日期会出现在这里。</p><Link href="/ask" className="button button--secondary">开始一个问题</Link></div>}<p className="reflection-history__privacy">当前阶段只保存在本次浏览器会话中。账号同步、跨设备记忆与提醒尚未启用。</p></section>
         <details className="profile-chart"><summary>查看我的四柱计算事实</summary><BaziChartCard reading={reading} /></details>
-        <section className="menu-list"><Link href="/report"><span>数字报告</span><small>Daily $1.99 · 十页 Detailed $19.99 · 一次性购买</small><b>→</b></Link><Link href="/objects"><span>象征物商城</span><small>浏览天然石、五行手链与命盘艺术</small><b>→</b></Link><button disabled><span>关系档案</span><small>后续阶段开放</small><b>即将开放</b></button><button disabled><span>通知与每日提醒</span><small>后续阶段开放</small><b>即将开放</b></button></section>
+        <section className="menu-list"><Link href="/report"><span>数字报告预览</span><small>Daily 与十页 Detailed · 公开测试阶段暂不出售</small><b>→</b></Link><Link href="/objects"><span>象征物商城</span><small>浏览天然石、五行手链与命盘艺术</small><b>→</b></Link><button disabled><span>关系档案</span><small>后续阶段开放</small><b>即将开放</b></button><button disabled><span>通知与每日提醒</span><small>后续阶段开放</small><b>即将开放</b></button></section>
         <section className="trust-card"><p className="eyebrow">TRUST & PRIVACY</p><h2>你的信息，只留在这次浏览会话</h2><p>出生资料只保存在当前浏览器会话中，不会上传、写入账户或发送分析事件。关闭会话后浏览器会清除它。</p><ul><li>八字、紫微和西占由版本锁定的本地引擎计算</li><li>时运使用 {experience.calculatedFor} 的干支、紫微运限与行星角距快照</li><li>综合解释由规则生成，不调用实时 AI 或追踪</li></ul><button className="text-button text-button--danger" onClick={clearProfile}>清除本次出生资料</button></section>
       </div>
     </PageShell>
@@ -1135,20 +1240,22 @@ function MePage() {
 }
 
 export function LifeMapApp({ initialRoute, resourceId }: { initialRoute: RouteName; resourceId?: string }) {
+  let content: ReactNode;
   switch (initialRoute) {
-    case "landing": return <LandingPage />;
-    case "onboarding": return <OnboardingPage />;
-    case "generating": return <GeneratingPage />;
-    case "today": return <TodayPage />;
-    case "insight": return <InsightPage id={resourceId} />;
-    case "life-map": return <LifeMapPage />;
-    case "domain": return <DomainPage id={resourceId} />;
-    case "ask": return <AskPage />;
-    case "iching": return <IChingPage />;
-    case "timing": return <TimingPage />;
-    case "objects": return <ObjectsPage />;
-    case "product": return <ProductPage id={resourceId} />;
-    case "report": return <ReportPage />;
-    case "me": return <MePage />;
+    case "landing": content = <LandingPage />; break;
+    case "onboarding": content = <OnboardingPage />; break;
+    case "generating": content = <GeneratingPage />; break;
+    case "today": content = <TodayPage />; break;
+    case "insight": content = <InsightPage id={resourceId} />; break;
+    case "life-map": content = <LifeMapPage />; break;
+    case "domain": content = <DomainPage id={resourceId} />; break;
+    case "ask": content = <AskPage />; break;
+    case "iching": content = <IChingPage />; break;
+    case "timing": content = <TimingPage />; break;
+    case "objects": content = <ObjectsPage />; break;
+    case "product": content = <ProductPage id={resourceId} />; break;
+    case "report": content = <ReportPage />; break;
+    case "me": content = <MePage />; break;
   }
+  return profileProtectedRoutes.has(initialRoute) ? <ProfileGate>{content}</ProfileGate> : content;
 }

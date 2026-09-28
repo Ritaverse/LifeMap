@@ -25,7 +25,7 @@ test("server-renders the Life Map landing experience", async () => {
   assert.match(html, /COMMUNITY IN THE MAKING/);
   assert.match(html, /aria-label="Life Map 首页"/);
   assert.match(html, /brand-mark__orbit/);
-  assert.match(html, /life-map-social\.png/);
+  assert.match(html, /life-map-social\.jpg/);
   assert.match(html, /免费生成三体系快照/);
   assert.match(html, /象征物商城/);
   assert.match(html, /进入商城/);
@@ -33,71 +33,45 @@ test("server-renders the Life Map landing experience", async () => {
   assert.doesNotMatch(html, /codex-preview|react-loading-skeleton/i);
 });
 
-test("server-renders directly addressable product routes", async () => {
-  for (const path of ["/today", "/life-map", "/ask", "/iching", "/timing", "/objects", "/report", "/me"]) {
+test("server-renders public routes and safely gates personalized routes", async () => {
+  for (const path of ["/objects", "/privacy", "/terms", "/digital-delivery", "/refund", "/support"]) {
     const response = await render(path);
     assert.equal(response.status, 200, path);
     assert.match(await response.text(), /Life Map/);
   }
+
+  for (const path of ["/today", "/life-map", "/ask", "/iching", "/timing", "/report", "/me"]) {
+    const response = await render(path);
+    assert.equal(response.status, 200, path);
+    const html = await response.text();
+    assert.match(html, /正在确认你的出生档案/, path);
+    assert.doesNotMatch(html, /你好，Yu|Yu 的人生地图/, path);
+  }
 });
 
-test("server-renders both one-time report tiers and evidence-grounded previews", async () => {
+test("server never renders a purchasable report without a verified browser profile", async () => {
   const response = await render("/report");
   assert.equal(response.status, 200);
   const html = await response.text();
-  assert.match(html, /Daily Report/);
-  assert.match(html, /购买 Daily Report · \$1\.99/);
-  assert.match(html, /购买 10 页 Detailed Report · \$19\.99/);
-  assert.match(html, /一页的结构，先完整看清/);
-  assert.match(html, /十页目录与三个完整章节/);
-  assert.match(html, /紫微十二宫/);
-  assert.match(html, /西方本命盘/);
-  assert.match(html, /今日综合洞察/);
-  assert.match(html, /命盘内容不会发送给 Shopify/);
-  assert.match(html, /不会自动续费/);
-  assert.match(html, /不是科学预测/);
-  assert.doesNotMatch(html, /storefront-access-token/i);
+  assert.match(html, /正在确认你的出生档案/);
+  assert.match(html, /noindex/);
+  assert.doesNotMatch(html, /购买 Daily Report|购买 10 页 Detailed Report|\$1\.99|\$19\.99|myshopify/i);
 });
 
-test("server-renders the interactive BaZi chart from calculated facts", async () => {
+test("server keeps calculated chart facts behind the local profile gate", async () => {
   const response = await render("/life-map");
   assert.equal(response.status, 200);
   const html = await response.text();
-  assert.match(html, /你的八字命盘/);
-  assert.match(html, /INTERACTIVE CHART · 命盘图/);
-  assert.match(html, /日主/);
-  assert.match(html, /藏干 · 支内十神/);
-  assert.match(html, /数量只描述表层干支/);
-  assert.match(html, /VISIBLE ELEMENTS · 表层五行/);
-  assert.match(html, /表层五行数量：/);
-  assert.match(html, /ZI WEI DOU SHU · 紫微斗数/);
-  assert.match(html, /WESTERN NATAL · 西方占星/);
-  assert.match(html, /data-chart-system="bazi"/);
-  assert.match(html, /data-chart-system="ziwei"/);
-  assert.match(html, /data-chart-system="astrology"/);
-  assert.match(html, /图上事实/);
-  assert.match(html, /传统观察/);
-  assert.match(html, /阅读边界/);
-  assert.match(html, /所有计算细节保持免费可查/);
-  assert.match(html, /完整盘负责展示/);
-  assert.match(html, /\/images\/brand\/life-map-confluence\.webp/);
-  assert.match(html, /alt="东方四柱与西方星盘交织的 Life Map 品牌抽象图"/);
-  assert.match(html, /width="768"/);
-  assert.match(html, /height="768"/);
-  assert.match(html, /品牌意象，非实际排盘/);
-  assert.doesNotMatch(html, /map-grid|map-pillars/);
-  assert.doesNotMatch(html, /正式 PDF 为 USD \$2/);
-  assert.match(html, /<svg\b/i);
+  assert.match(html, /正在确认你的出生档案/);
+  assert.doesNotMatch(html, /你的八字命盘|ZI WEI DOU SHU|WESTERN NATAL|data-chart-system/);
 });
 
-test("server-renders the structured decision session", async () => {
+test("server keeps the decision session behind the local profile gate", async () => {
   const response = await render("/ask");
   assert.equal(response.status, 200);
   const html = await response.text();
-  assert.match(html, /DECISION SESSION/);
-  assert.match(html, /你正在面对什么问题/);
-  assert.match(html, /你正在比较哪些选择/);
-  assert.match(html, /生成我的决策地图/);
+  assert.match(html, /正在确认你的出生档案/);
+  assert.doesNotMatch(html, /你正在面对什么问题|生成我的决策地图/);
 });
 
 test("server-renders original product imagery with useful alternative text", async () => {
@@ -110,16 +84,16 @@ test("server-renders original product imagery with useful alternative text", asy
   assert.match(html, /五行手链/);
   assert.match(html, /命盘艺术/);
   assert.match(html, /无功效承诺/);
-  assert.match(html, /\/images\/products\/green-aventurine\.jpg/);
+  assert.match(html, /src="\/images\/products\/green-aventurine\.jpg"/);
   assert.match(html, /一块置于深色石台上的天然绿东陵石/);
-  assert.match(html, /\/images\/products\/personal-life-map-art\.jpg/);
+  assert.match(html, /src="\/images\/products\/personal-life-map-art\.jpg"/);
   assert.doesNotMatch(html, /的抽象演示图/);
 });
 
 test("unknown dynamic records render a useful error state", async () => {
   for (const path of ["/insights/missing", "/life-map/missing", "/objects/missing"]) {
     const response = await render(path);
-    assert.equal(response.status, 200, path);
-    assert.match(await response.text(), /没有找到/);
+    assert.equal(response.status, 404, path);
+    assert.match(await response.text(), /这里没有找到对应的页面/);
   }
 });

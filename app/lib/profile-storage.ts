@@ -1,5 +1,5 @@
-import { defaultBirthPlace, isBirthPlace } from "./bazi.ts";
-import type { BirthPlace, BirthProfileInput, TraditionalGender } from "./bazi.ts";
+import { defaultBirthPlace, isBirthPlace } from "./birth-profile.ts";
+import type { BirthPlace, BirthProfileInput, TraditionalGender } from "./birth-profile.ts";
 
 const profileKey = "life-map-birth-profile-v1";
 const draftKey = "life-map-onboarding";
@@ -56,6 +56,7 @@ export function clearBirthProfile() {
   sessionStorage.removeItem(draftKey);
   sessionStorage.removeItem("life-map-complete");
   sessionStorage.removeItem("life-map-focus");
+  sessionStorage.removeItem("life-map-ask-handoff-v1");
 }
 
 export function readOnboardingDraft(fallback: OnboardingDraft): OnboardingDraft {
