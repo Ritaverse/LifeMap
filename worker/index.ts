@@ -1,9 +1,9 @@
 /** Cloudflare Worker entry point for Life Map. */
 import handler from "vinext/server/app-router-entry";
+import { handleReportRequest, runReportMaintenance } from "./report-service.ts";
+import type { ReportWorkerEnv } from "./report-store.ts";
 
-interface Env {
-  ASSETS: Fetcher;
-}
+type Env = ReportWorkerEnv;
 
 interface ExecutionContext {
   waitUntil(promise: Promise<unknown>): void;
@@ -12,8 +12,13 @@ interface ExecutionContext {
 
 const worker = {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    const reportResponse = await handleReportRequest(request, env, ctx);
+    if (reportResponse) return applyResponseHeaders(request, reportResponse);
     const response = await handler.fetch(request, env, ctx);
     return applyResponseHeaders(request, response);
+  },
+  async scheduled(_controller: unknown, env: Env, ctx: ExecutionContext): Promise<void> {
+    ctx.waitUntil(runReportMaintenance(env));
   },
 };
 
@@ -42,8 +47,6 @@ function contentSecurityPolicy(url: URL) {
   const connectSources = [
     "'self'",
     "https://geocoding-api.open-meteo.com",
-    "https://dj4xdu-gb.myshopify.com",
-    "https://checkout.shopify.com",
     ...(localDevelopment ? ["ws:", "wss:"] : []),
   ].join(" ");
 

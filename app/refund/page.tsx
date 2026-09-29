@@ -4,7 +4,7 @@ import { PublicTrustLayout } from "../ui/PublicTrustLayout";
 
 export const metadata: Metadata = {
   title: "退款政策",
-  description: "Life Map 公开测试期间的无销售状态，以及未来个性化数字报告的退款政策框架。",
+  description: "Life Map 个性化数字报告的退款资格、申请期限与撤销规则。",
   alternates: { canonical: "/refund" },
 };
 
@@ -13,17 +13,17 @@ export default function RefundPage() {
     <PublicTrustLayout
       currentPath="/refund"
       eyebrow="Refunds · 退款"
-      title="测试期间没有需要退款的销售"
-      summary="Life Map 公开测试版不接受报告付款，因此目前不会产生扣款、订单或退款。以下内容是正式销售前必须完成并公布的政策框架。"
+      title="数字报告退款与撤销"
+      summary="USD $2.00 个性化报告属于一次性数字商品。购买入口关闭时不会产生订单；开放后，以下规则适用于已验证的 Life Map 报告订单。"
     >
       <section>
-        <h2>当前测试版</h2>
-        <p>购买按钮会保持关闭或明确标为不可购买。如果你在其他页面看到 Shopify 商店或旧链接，请不要付款，并通过 <a href="/support">支持页面</a> 告知我们。</p>
+        <h2>购买入口关闭时</h2>
+        <p>如果报告页显示“购买尚未开放”，就不会创建有效的 Life Map 报告订单。请勿使用旧 Shopify 链接付款，并通过 <a href="/support">支持页面</a> 告知我们。</p>
       </section>
 
       <section>
-        <h2>未来开放后的基本原则</h2>
-        <p>正式政策会尊重适用的消费者保护法律。个性化数字报告生成后通常无法像实体商品一样退回，但以下情况将提供退款或重新交付：</p>
+        <h2>基本原则</h2>
+        <p>本政策尊重适用的消费者保护法律。个性化数字报告生成后通常无法像实体商品一样退回，但以下情况会提供退款或重新交付：</p>
         <ul>
           <li>同一订单发生重复扣款；</li>
           <li>确认收款后，系统故障导致报告无法生成或交付，且合理排查后仍未解决；</li>
@@ -39,16 +39,17 @@ export default function RefundPage() {
           <li>不认同反思性解释，或期待命盘对现实结果作出保证；</li>
           <li>用户提交的出生日期、时间或地点有误，而文件已据此生成。</li>
         </ul>
-        <p>这些限制不会减少适用法律赋予你的强制性权利。正式销售前，我们还会公布申请期限、处理时效和退款原路返回方式。</p>
+        <p>这些限制不会减少适用法律赋予你的强制性权利。除适用法律规定更长期限外，请在购买后 14 个自然日内提交申请；我们会在 5 个工作日内确认受理，批准的退款退回 Shopify 原付款方式，实际到账时间由支付机构决定。</p>
+        <p>Shopify 发出退款或取消事件后，Life Map 会撤销所有下载密钥并删除私人 PDF；之后如需报告，需要重新生成和购买。</p>
       </section>
 
       <section>
-        <h2>未来如何申请</h2>
+        <h2>如何申请</h2>
         <p>
-          申请时只需提供订单号、购买邮箱和问题说明。请勿在支持邮件中发送完整出生资料。{publicSupportEmail ? <>未来可联系 <a href={`mailto:${publicSupportEmail}`}>{publicSupportEmail}</a>；销售开放前仍会公布处理时效。</> : <>公开支持邮箱尚未启用，必须在销售开放前完成地址与回复流程验证。</>}
+          申请时只需提供订单号、购买邮箱和问题说明。请勿在支持邮件中发送完整出生资料。{publicSupportEmail ? <>可联系 <a href={`mailto:${publicSupportEmail}`}>{publicSupportEmail}</a>。</> : <>公开支持邮箱尚未启用，因此付费上线门槛保持关闭。</>}
         </p>
         <aside>
-          <p><strong>尚未生效：</strong>个性化数字报告仍未对外销售。最终退款条款将在购买按钮启用前显示于结账入口附近。</p>
+          <p><strong>订单识别：</strong>只处理从当前 Life Map 报告页创建、且商品与金额验证通过的订单。请勿在支持邮件中发送出生资料或完整报告。</p>
         </aside>
         <p><time dateTime="2026-09-28">更新日期：2026 年 9 月 28 日</time></p>
       </section>

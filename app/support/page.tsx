@@ -41,8 +41,9 @@ export default function SupportPage() {
         <h2>常见问题入口</h2>
         <ul>
           <li>资料保存在何处：查看 <a href="/privacy">隐私政策</a>。</li>
-          <li>为什么不能购买报告：查看 <a href="/digital-delivery">数字交付说明</a>。</li>
-          <li>未来退款范围：查看 <a href="/refund">退款政策</a>。</li>
+          <li>购买状态与交付期限：查看 <a href="/digital-delivery">数字交付说明</a>。</li>
+          <li>重新发送下载链接：前往 <a href="/report/access">报告恢复页</a>。</li>
+          <li>退款范围：查看 <a href="/refund">退款政策</a>。</li>
           <li>反思工具的使用边界：查看 <a href="/terms">使用条款</a>。</li>
         </ul>
       </section>
@@ -53,7 +54,7 @@ export default function SupportPage() {
           Life Map 不是医疗、心理、法律、财务或紧急支持服务。如果你或他人可能处于即时危险中，请联系所在地的紧急服务或可信赖的专业支持，不要等待本网站回复。
         </p>
         <aside>
-          <p><strong>报告销售尚未开放：</strong>我们目前无法查询 Shopify 订单或补发付费 PDF，因为有效的 Life Map 付费交付流程尚未上线。</p>
+          <p><strong>订单支持：</strong>先使用报告恢复页自助补发链接。联系支持时只提供 Shopify 订单号、购买邮箱和问题描述；不要发送出生资料、付款卡号或完整 PDF。</p>
         </aside>
         <p><time dateTime="2026-09-28">更新日期：2026 年 9 月 28 日</time></p>
       </section>

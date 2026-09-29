@@ -126,7 +126,7 @@ export function buildLifeMapReport(experience: CalculatedExperience, generatedOn
       {
         id: "method", number: 2, eyebrow: "01 · METHOD", title: "这份报告如何生成", subtitle: "先计算，再连接证据；每一层都有边界。",
         blocks: [
-          { id: "method-local", kind: "methodology", label: "PRIVATE BY DESIGN", title: "出生资料留在当前浏览器", body: "报告在浏览器会话内生成。购买时不会把姓名、出生日期、时间、地点或命盘内容发送给 Shopify。" },
+          { id: "method-local", kind: "methodology", label: "PRIVATE BY DESIGN", title: "原始资料不进入商店", body: "出生表单与命盘 JSON 留在当前浏览器；只有完成排版的私人 PDF 会上传到 Life Map 交付空间。Shopify 只收到随机报告编号，不收到姓名、出生资料、地点或命盘内容。" },
           { id: "method-engines", kind: "calculated-fact", label: "VERSIONED ENGINES", title: "四套可复算输出", body: `${bazi.engine.id} v${bazi.engine.version}；${ziwei.engine.id} v${ziwei.engine.version}；${western.engine.id} v${western.engine.version}；${experience.engine.id} v${experience.engine.version}。` },
           { id: "method-synthesis", kind: "methodology", label: "RULE SYNTHESIS", title: "综合洞察不是实时 AI", body: "规则层只连接本报告中的稳定事实 ID。两个或以上体系指向同一主题时才标记共识；不一致时保留张力。" },
         ],

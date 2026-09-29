@@ -3,7 +3,7 @@ import { PublicTrustLayout } from "../ui/PublicTrustLayout";
 
 export const metadata: Metadata = {
   title: "数字报告交付",
-  description: "Life Map 数字报告的销售状态，以及未来正式开放前需要明确的交付规则。",
+  description: "Life Map USD $2 完整数字报告的生成、付款验证、邮件交付与访问恢复规则。",
   alternates: { canonical: "/digital-delivery" },
 };
 
@@ -12,43 +12,44 @@ export default function DigitalDeliveryPage() {
     <PublicTrustLayout
       currentPath="/digital-delivery"
       eyebrow="Digital Delivery · 数字交付"
-      title="报告销售尚未开放"
-      summary="当前公开测试版只提供页面内预览，不收款，也不会在付款后生成或发送 PDF。任何报告预览都不是已购买商品。"
+      title="一份报告，一个清楚价格"
+      summary="Life Map 只销售一款 USD $2.00 的十页个性化 PDF。购买入口会在整条私人交付链通过检查后自动开放；门槛未通过时不会进入结账。"
     >
       <section>
-        <h2>现在的状态</h2>
+        <h2>商品与包含内容</h2>
         <ul>
-          <li>所有付费报告入口在公开测试期间保持关闭或明确标为不可购买。</li>
-          <li>当前没有付费订单、下载权利、邮件附件或自动续费。</li>
+          <li>商品：Life Map Full Personal Report，十页 PDF，USD $2.00，一次性购买。</li>
+          <li>包括八字、紫微、西占、当前时运、跨体系证据、八个生命领域、七日练习与限制说明。</li>
+          <li>没有订阅、自动续费、实体配送或额外隐藏档位。</li>
           <li>免费命盘事实与证据不会因未来报告销售而被隐藏。</li>
         </ul>
       </section>
 
       <section>
-        <h2>正式开放前会明确什么</h2>
-        <p>在接受第一笔付款以前，我们会在商品页和本页清楚列出：</p>
+        <h2>付款后如何交付</h2>
         <ul>
-          <li>最终价格、币种、税费和报告包含的页数或章节；</li>
-          <li>文件格式、预计生成时间、交付方式与下载有效期；</li>
-          <li>支付成功但未收到文件时的恢复流程；</li>
-          <li>个人使用许可、重新下载范围，以及退款例外。</li>
+          <li>浏览器先生成 PDF，并把随机报告编号带入 Shopify；Shopify 不接收报告正文。</li>
+          <li>只有经过 HMAC 验证且商品、币种、金额与付款状态全部匹配的订单才会解锁文件。</li>
+          <li>下载邮件中的访问链接有效 24 小时；交换后形成 15 分钟下载会话，最多下载 3 次。</li>
+          <li>报告保留 30 天。期间可在 <a href="/report/access">报告恢复页</a>用订单号和购买邮箱申请新链接。</li>
+          <li>未开始结账的临时 PDF 会在 24 小时后删除；已创建 Shopify 结账的文件最多保留 32 天，确保购物车仍可付款时不会提前丢失交付文件。</li>
         </ul>
       </section>
 
       <section>
-        <h2>计划中的资料边界</h2>
+        <h2>资料边界</h2>
         <p>
-          未来结账预计由 Shopify 处理，但 Life Map 不会把命盘称呼、出生日期、出生时间、出生地点、命盘事实或反思内容作为商品属性发送给 Shopify。Shopify 可能另行收集完成结账所需的联系与付款信息；正式实现后会先更新
+          Shopify 处理结账，但 Life Map 不会把命盘称呼、出生日期、出生时间、出生地点、命盘事实、反思内容或 PDF 作为商品属性发送给 Shopify。Shopify 可能另行收集完成结账所需的联系与付款信息；详情见
           <a href="/privacy">隐私政策</a>。
         </p>
         <aside>
-          <p><strong>请不要测试真实付款：</strong>在本页取消“销售尚未开放”提示前，任何外部商店页面都不应被视为 Life Map 的有效购买流程。</p>
+          <p><strong>安全门槛优先：</strong>如果报告页显示“购买尚未开放”，请不要使用旧 Shopify 链接付款。只有从 Life Map 当前报告页创建的随机报告订单才能自动交付。</p>
         </aside>
       </section>
 
       <section>
         <h2>遇到问题</h2>
-        <p>当前预览问题请查看 <a href="/support">支持页面</a>。未来数字订单开放后，本页会增加订单恢复入口和明确的交付时效。</p>
+        <p>未收到邮件时，请先查看垃圾邮件，再使用 <a href="/report/access">/report/access</a> 恢复。仍有问题可查看 <a href="/support">支持页面</a>；请勿发送出生资料或完整 PDF。</p>
         <p><time dateTime="2026-09-28">更新日期：2026 年 9 月 28 日</time></p>
       </section>
     </PublicTrustLayout>

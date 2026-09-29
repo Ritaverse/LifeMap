@@ -14,9 +14,9 @@ async function render(path) {
 
 const routes = [
   ["/privacy", /隐私政策/, /Open-Meteo/, /sessionStorage/],
-  ["/terms", /使用条款/, /不是科学测评/, /销售尚未开放/],
-  ["/digital-delivery", /数字报告交付/, /报告销售尚未开放/, /不会在付款后生成或发送 PDF/],
-  ["/refund", /退款政策/, /测试期间没有需要退款的销售/, /重复扣款/],
+  ["/terms", /使用条款/, /不是科学测评/, /购买入口只有在付款验证/],
+  ["/digital-delivery", /数字报告交付/, /USD \$2\.00/, /HMAC 验证/],
+  ["/refund", /退款政策/, /购买入口关闭/, /14 个自然日/],
   ["/support", /支持/, /尚未启用公开支持邮箱/, /站点会保持非公开/],
 ];
 

@@ -12,7 +12,9 @@ Rules are explicit: Gregorian input, Li Chun year boundary, solar-term month bou
 
 The synthesis layer is deterministic and evidence-grounded. It links stable calculated fact IDs, requires two or more systems for a consensus label, and preserves disagreement as tension. It does not call live AI or calculate chart positions with an LLM.
 
-The browser session is the only persistence layer. Only a user-submitted city/country search term reaches the geocoding provider; name, birth date, and birth time are not included. Birth details are not placed in URLs, logs, analytics, or accounts. Users can clear the session profile from `/me`.
+The browser session remains the only persistence layer for raw birth profiles and chart JSON. Only a user-submitted city/country search term reaches the geocoding provider; name, birth date, and birth time are not included. Birth details are not placed in URLs, logs, analytics, or accounts. Users can clear the session profile from `/me`.
+
+The optional paid-report path is isolated behind a launch gate. After explicit purchase intent, the browser sends only the finished PDF to private R2. D1 stores opaque job/order metadata, hashes, encrypted delivery state, and retention deadlines. Shopify receives one product and a random job ID, never raw birth data or chart facts.
 
 ## Acceptance Criteria
 
@@ -24,12 +26,14 @@ The browser session is the only persistence layer. Only a user-submitted city/co
 - `/life-map` exposes BaZi pillars, Zi Wei palaces, Western placements, angles, houses, and aspects without inferring guaranteed outcomes.
 - Current timing identifies its target date and source facts across BaZi, Zi Wei, and Western transits.
 - Every rule-synthesized insight resolves to calculated evidence, and the report includes all supported systems.
-- Direct routes still render without a saved profile by using the fictional sample input.
+- Personalized direct routes without a saved profile redirect to onboarding; fictional sample input cannot reach checkout.
+- The one USD $2 report validates Shopify HMAC, variant, currency, subtotal, tax, discounts, shipping, duties, and paid state before delivery.
+- Duplicate, failed, abandoned, expired, refunded, cancelled, recovery, and private-download paths have D1/R2 integration tests.
 - Type checking, linting, tests, and deployment build pass.
 
 ## Deferred Slices
 
 1. Opt-in true-solar-time conventions and additional Zi Wei school controls.
 2. Live AI synthesis, only after prompt/evaluation safeguards and evidence citation are specified.
-3. Accounts, relationship profiles, server-side report fulfillment, and long-range timing.
+3. Accounts, relationship profiles, and long-range timing.
 4. Production analytics and notification infrastructure with explicit privacy review.

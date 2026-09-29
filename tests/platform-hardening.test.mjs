@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createReportCheckout } from "../app/lib/shopify.ts";
 import { resolvePublicSiteUrl, resolveSupportEmail } from "../app/lib/site-config.ts";
 
 async function render(path = "/", origin = "https://lifemap.fyi") {
@@ -37,7 +36,7 @@ test("production responses include compatible security headers", async () => {
   assert.match(policy, /script-src 'self' 'unsafe-inline'/);
   assert.match(policy, /frame-ancestors 'none'/);
   assert.match(policy, /connect-src[^;]*https:\/\/geocoding-api\.open-meteo\.com/);
-  assert.match(policy, /connect-src[^;]*https:\/\/dj4xdu-gb\.myshopify\.com/);
+  assert.doesNotMatch(policy, /connect-src[^;]*myshopify/);
   assert.doesNotMatch(policy, /unsafe-eval/);
   assert.equal(response.headers.get("cross-origin-opener-policy"), "same-origin");
   assert.match(response.headers.get("permissions-policy") ?? "", /camera=\(\)/);
@@ -87,45 +86,4 @@ test("robots, sitemap, manifest, and not-found routes render", async () => {
   const missing = await render("/this-route-does-not-exist");
   assert.equal(missing.status, 404);
   assert.match(await missing.text(), /这里没有找到对应的页面/);
-});
-
-test("checkout accepts exact Shopify hosts and rejects other myshopify stores", async () => {
-  const previous = process.env.NEXT_PUBLIC_SHOPIFY_STOREFRONT_TOKEN;
-  process.env.NEXT_PUBLIC_SHOPIFY_STOREFRONT_TOKEN = "public-test-token";
-  try {
-    const trusted = await createReportCheckout("daily", async () => new Response(JSON.stringify({
-      data: {
-        cartCreate: {
-          cart: {
-            checkoutUrl: "https://checkout.shopify.com/checkouts/example",
-            totalQuantity: 1,
-            cost: { totalAmount: { amount: "1.99", currencyCode: "USD" } },
-          },
-          userErrors: [],
-          warnings: [],
-        },
-      },
-    }), { status: 200, headers: { "content-type": "application/json" } }));
-    assert.equal(new URL(trusted.checkoutUrl).hostname, "checkout.shopify.com");
-
-    await assert.rejects(
-      () => createReportCheckout("daily", async () => new Response(JSON.stringify({
-        data: {
-          cartCreate: {
-            cart: {
-              checkoutUrl: "https://attacker.myshopify.com/checkouts/example",
-              totalQuantity: 1,
-              cost: { totalAmount: { amount: "1.99", currencyCode: "USD" } },
-            },
-            userErrors: [],
-            warnings: [],
-          },
-        },
-      }), { status: 200, headers: { "content-type": "application/json" } })),
-      /unexpected checkout address/,
-    );
-  } finally {
-    if (previous === undefined) delete process.env.NEXT_PUBLIC_SHOPIFY_STOREFRONT_TOKEN;
-    else process.env.NEXT_PUBLIC_SHOPIFY_STOREFRONT_TOKEN = previous;
-  }
 });

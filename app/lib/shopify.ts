@@ -1,135 +1,97 @@
-export type ReportProductKind = "daily" | "detailed";
+import { FULL_REPORT_PRODUCT, REPORT_SCHEMA_VERSION } from "./report-product.ts";
 
-const SHOPIFY_STORE = {
-  domain: "dj4xdu-gb.myshopify.com",
-  apiVersion: "2026-04",
-} as const;
+export interface ReportLaunchReadiness {
+  available: boolean;
+}
 
-export const REPORT_PRODUCTS = {
-  daily: {
-    kind: "daily",
-    reportKind: "daily-reflection",
-    productId: "gid://shopify/Product/8296521891909",
-    variantId: "gid://shopify/ProductVariant/45812444725317",
-    title: "Life Map Daily Report",
-    price: "1.99",
-    currencyCode: "USD",
-    pages: 1,
-  },
-  detailed: {
-    kind: "detailed",
-    reportKind: "detailed-ten-page-reflection",
-    productId: "gid://shopify/Product/8295435862085",
-    variantId: "gid://shopify/ProductVariant/45796622925893",
-    title: "Life Map 10-Page Detailed Report",
-    price: "19.99",
-    currencyCode: "USD",
-    pages: 10,
-  },
-} as const satisfies Record<ReportProductKind, {
-  kind: ReportProductKind;
-  reportKind: string;
-  productId: string;
-  variantId: string;
-  title: string;
-  price: string;
-  currencyCode: "USD";
-  pages: number;
-}>;
-
-export const CREATE_REPORT_CART_MUTATION = `mutation CreateReportCart($input: CartInput!) {
-  cartCreate(input: $input) {
-    cart {
-      checkoutUrl
-      totalQuantity
-      cost {
-        totalAmount { amount currencyCode }
-      }
-    }
-    userErrors { field message }
-    warnings { code message }
-  }
-}`;
-
-interface CartResponse {
-  data?: {
-    cartCreate?: {
-      cart?: {
-        checkoutUrl: string;
-        totalQuantity: number;
-        cost: { totalAmount: { amount: string; currencyCode: string } };
-      } | null;
-      userErrors: Array<{ field?: string[]; message: string }>;
-      warnings: Array<{ code?: string; message: string }>;
-    };
-  };
-  errors?: Array<{ message: string }>;
+export interface ReportJobReceipt {
+  jobId: string;
+  capability: string;
+  expiresAt: string;
 }
 
 export interface ReportCheckout {
-  kind: ReportProductKind;
   checkoutUrl: string;
-  amount: string;
-  currencyCode: string;
-  source: "storefront-api" | "cart-permalink";
+  amount: typeof FULL_REPORT_PRODUCT.price;
+  currencyCode: typeof FULL_REPORT_PRODUCT.currencyCode;
 }
 
-function validateCheckoutUrl(value: string) {
-  const url = new URL(value);
-  const allowed = url.protocol === "https:" && (
-    url.hostname === SHOPIFY_STORE.domain ||
-    url.hostname === "checkout.shopify.com"
-  );
-  if (!allowed) throw new Error("Shopify returned an unexpected checkout address");
-  return url.toString();
+interface ApiErrorBody {
+  error?: string;
 }
 
-export function reportCartInput(kind: ReportProductKind) {
-  const product = REPORT_PRODUCTS[kind];
-  return {
-    lines: [{ merchandiseId: product.variantId, quantity: 1 }],
-    attributes: [
-      { key: "report_kind", value: product.reportKind },
-      { key: "privacy_mode", value: "local-only" },
-    ],
-  };
-}
-
-export async function createReportCheckout(kind: ReportProductKind, fetcher: typeof fetch = fetch): Promise<ReportCheckout> {
-  const product = REPORT_PRODUCTS[kind];
-  const token = process.env.NEXT_PUBLIC_SHOPIFY_STOREFRONT_TOKEN?.trim();
-  if (!token) {
-    return {
-      kind,
-      checkoutUrl: validateCheckoutUrl(`https://${SHOPIFY_STORE.domain}/cart/${product.variantId.split("/").at(-1)}:1`),
-      amount: product.price,
-      currencyCode: product.currencyCode,
-      source: "cart-permalink",
-    };
+async function apiError(response: Response, fallback: string) {
+  try {
+    const body = await response.json() as ApiErrorBody;
+    return new Error(body.error || fallback);
+  } catch {
+    return new Error(fallback);
   }
+}
 
-  const response = await fetcher(`https://${SHOPIFY_STORE.domain}/api/${SHOPIFY_STORE.apiVersion}/graphql.json`, {
+export async function getReportLaunchReadiness(fetcher: typeof fetch = fetch): Promise<ReportLaunchReadiness> {
+  const response = await fetcher("/api/report/readiness", {
+    headers: { accept: "application/json" },
+    cache: "no-store",
+  });
+  if (!response.ok) return { available: false };
+  const body = await response.json() as Partial<ReportLaunchReadiness>;
+  return { available: body.available === true };
+}
+
+export async function createPrivateReportJob(
+  pdf: Uint8Array,
+  fetcher: typeof fetch = fetch,
+): Promise<ReportJobReceipt> {
+  const digest = await crypto.subtle.digest("SHA-256", new Uint8Array(pdf));
+  const sha256 = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+  const response = await fetcher("/api/report/jobs", {
     method: "POST",
     headers: {
-      "content-type": "application/json",
-      "x-shopify-storefront-access-token": token,
+      "content-type": "application/pdf",
+      "x-life-map-pdf-sha256": sha256,
+      "x-life-map-pdf-pages": String(FULL_REPORT_PRODUCT.pages),
+      "x-life-map-report-schema": REPORT_SCHEMA_VERSION,
     },
-    body: JSON.stringify({ query: CREATE_REPORT_CART_MUTATION, variables: { input: reportCartInput(kind) } }),
+    body: new Blob([new Uint8Array(pdf)], { type: "application/pdf" }),
   });
-  const body = await response.json() as CartResponse;
-  const payload = body.data?.cartCreate;
-  const message = payload?.userErrors?.[0]?.message ?? body.errors?.[0]?.message;
-  if (!response.ok || !payload?.cart || message) throw new Error(message ?? "Shopify checkout is temporarily unavailable");
+  if (!response.ok) throw await apiError(response, "私人报告暂时无法安全保存，请稍后重试。");
+  return response.json() as Promise<ReportJobReceipt>;
+}
 
-  const total = payload.cart.cost.totalAmount;
-  if (payload.cart.totalQuantity !== 1 || total.amount !== product.price || total.currencyCode !== product.currencyCode) {
-    throw new Error("Shopify returned an unexpected report total");
-  }
-  return {
-    kind,
-    checkoutUrl: validateCheckoutUrl(payload.cart.checkoutUrl),
-    amount: total.amount,
-    currencyCode: total.currencyCode,
-    source: "storefront-api",
-  };
+export async function createReportCheckout(
+  job: Pick<ReportJobReceipt, "jobId" | "capability">,
+  fetcher: typeof fetch = fetch,
+): Promise<ReportCheckout> {
+  const response = await fetcher(`/api/report/jobs/${encodeURIComponent(job.jobId)}/checkout`, {
+    method: "POST",
+    headers: {
+      accept: "application/json",
+      authorization: `Bearer ${job.capability}`,
+    },
+  });
+  if (!response.ok) throw await apiError(response, "Shopify 结账暂时不可用，请稍后重试。");
+  return response.json() as Promise<ReportCheckout>;
+}
+
+export async function requestReportAccess(
+  orderNumber: string,
+  email: string,
+  fetcher: typeof fetch = fetch,
+): Promise<void> {
+  const response = await fetcher("/api/report/access/request", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ orderNumber, email }),
+  });
+  if (!response.ok) throw await apiError(response, "暂时无法提交恢复请求，请稍后重试。");
+}
+
+export async function exchangeReportAccessToken(token: string, fetcher: typeof fetch = fetch): Promise<void> {
+  const response = await fetcher("/api/report/access/exchange", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ token }),
+  });
+  if (!response.ok) throw await apiError(response, "这个下载链接无效或已经过期。");
 }

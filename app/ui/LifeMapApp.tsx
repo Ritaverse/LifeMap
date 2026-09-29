@@ -16,7 +16,9 @@ import type { OnboardingDraft, ReflectionFocus } from "../lib/profile-storage";
 import { clearReflections, readReflections, removeReflection, saveReflection } from "../lib/reflection-storage";
 import type { SavedReflection } from "../lib/reflection-storage";
 import { buildDailyReport, buildLifeMapReport } from "../lib/report";
+import { FULL_REPORT_PRODUCT } from "../lib/report-product";
 import { classifySafetyConcern } from "../lib/safety";
+import { createPrivateReportJob, createReportCheckout, getReportLaunchReadiness } from "../lib/shopify";
 import type { SafetyBoundary } from "../lib/safety";
 import type { AskResponse, DomainId, EvidenceRef, IChingLine, Product, SystemId } from "../lib/types";
 import type { WesternReading } from "../lib/western";
@@ -782,11 +784,11 @@ function ReportOffer({ compact = false }: { compact?: boolean }) {
     <section className={`report-offer ${compact ? "report-offer--compact" : ""}`}>
       <div className="report-offer__folio" aria-hidden="true"><span>1·10</span><i /><i /><i /></div>
       <div>
-        <p className="eyebrow">PRIVATE PDF · PUBLIC BETA PREVIEW</p>
-        <h2>先看一页与十页报告结构</h2>
-        <p>Daily Report 聚焦今天；Detailed Report 整理八字、紫微、西占、当前时运、证据综合与七日练习。公开测试阶段只开放本地预览，不收取付款。</p>
-        <div className="report-offer__meta"><strong>DAILY · PREVIEW</strong><strong>10 PAGES · PREVIEW</strong><span>购买暂未开放</span></div>
-        <Link href="/report" className="button button--primary">查看免费报告预览 <span aria-hidden="true">→</span></Link>
+        <p className="eyebrow">PRIVATE PDF · FULL REPORT</p>
+        <h2>把三套命盘整理成十页私人报告</h2>
+        <p>一份报告包含八字、紫微、西占、当前时运、证据综合与七日练习。唯一价格是 USD $2；安全上线门槛未通过时不会进入结账。</p>
+        <div className="report-offer__meta"><strong>10 PAGES · PERSONAL</strong><strong>ONE-TIME · $2 USD</strong><span>私人交付</span></div>
+        <Link href="/report" className="button button--primary">查看完整报告说明 <span aria-hidden="true">→</span></Link>
       </div>
     </section>
   );
@@ -1103,52 +1105,86 @@ function ReportPage() {
   const { reading, experience, calculationError, loading } = useActiveExperience();
   const dailyReport = useMemo(() => experience ? buildDailyReport(experience, experience.calculatedFor) : null, [experience]);
   const detailedReport = useMemo(() => experience ? buildLifeMapReport(experience, experience.calculatedFor) : null, [experience]);
+  const [launchState, setLaunchState] = useState<"checking" | "available" | "unavailable">("checking");
+  const [purchaseState, setPurchaseState] = useState<"idle" | "rendering" | "uploading" | "checkout" | "error">("idle");
+  const [purchaseError, setPurchaseError] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    getReportLaunchReadiness()
+      .then((result) => active && setLaunchState(result.available ? "available" : "unavailable"))
+      .catch(() => active && setLaunchState("unavailable"));
+    return () => { active = false; };
+  }, []);
 
   if (loading) return <CalculationLoadingState route="report" />;
   if (!experience || !dailyReport || !detailedReport) return <ErrorState route="report" title="数字报告无法生成" message={calculationError ?? "请检查出生资料。"} href="/onboarding" action="检查出生资料" />;
   const dailyPage = dailyReport.pages[0];
   const previewPages = detailedReport.pages.filter((page) => [1, 7, 9].includes(page.number));
+  const buying = !["idle", "error"].includes(purchaseState);
+  const purchaseLabel = purchaseState === "rendering"
+    ? "正在生成私人 PDF…"
+    : purchaseState === "uploading"
+      ? "正在进入私人交付队列…"
+      : purchaseState === "checkout"
+        ? "正在打开 Shopify…"
+        : launchState === "checking"
+          ? "正在检查安全上线状态…"
+          : launchState === "unavailable"
+            ? "购买尚未开放"
+            : `购买完整报告 · $${FULL_REPORT_PRODUCT.price} USD`;
+
+  const purchase = async () => {
+    if (launchState !== "available" || buying) return;
+    setPurchaseError("");
+    try {
+      setPurchaseState("rendering");
+      const { renderLifeMapReportPdf } = await import("../lib/report-pdf");
+      const pdf = await renderLifeMapReportPdf(detailedReport);
+      setPurchaseState("uploading");
+      const job = await createPrivateReportJob(pdf);
+      setPurchaseState("checkout");
+      const checkout = await createReportCheckout(job);
+      window.location.assign(checkout.checkoutUrl);
+    } catch (error) {
+      setPurchaseError(error instanceof Error ? error.message : "报告暂时无法进入结账，请稍后重试。");
+      setPurchaseState("error");
+    }
+  };
 
   return (
     <PageShell route="report" title="数字报告" eyebrow="PRIVATE PDF" backHref="/today">
       <div className="page report-page">
         <header className="report-intro">
           <div>
-            <p className="eyebrow">PRIVATE EDITIONS · PUBLIC BETA</p>
-            <h1>先看报告，<br />暂不进入结账</h1>
-            <p>Daily Report 用一页回答“今天值得留意什么”；Detailed Report 用十页整理完整命盘、当期线索和可追溯依据。公开测试阶段只开放预览与本地打印，购买将在安全交付完成后开放。</p>
+            <p className="eyebrow">PRIVATE EDITION · ONE CLEAR PRICE</p>
+            <h1>一份完整报告，<br />USD $2</h1>
+            <p>十页整理八字、紫微、西占、当前时运和可追溯综合。PDF 在你的浏览器生成；Shopify 只收到随机报告编号、商品与金额。</p>
             <div className="report-intro__actions">
               <button className="button button--secondary" type="button" onClick={() => window.print()}>保存本地预览</button>
               <a className="button button--tertiary" href="/downloads/life-map-full-daily-report-sample.pdf" download>下载十页演示 PDF</a>
             </div>
-            <p className="report-privacy">当前不会创建 Shopify 订单或收取付款。免费命盘事实与证据不会被报告付费墙锁住。</p>
+            <p className="report-privacy">免费命盘事实与证据不会被付费墙锁住。未开始结账的文件 24 小时删除；已创建结账的文件覆盖 Shopify 购物车有效期，付款后最多保留 30 天。</p>
           </div>
         </header>
 
         <section className="report-selector" aria-labelledby="report-selector-title">
-          <div className="report-selector__heading"><p className="eyebrow">COMPARE THE FORMATS · 比较阅读深度</p><h2 id="report-selector-title">两份报告，各自解决什么</h2><p>这是内容与版式预览。公开测试期间购买按钮保持停用，直到付款验证、私人 PDF 交付与退款流程完成端到端测试。</p></div>
-          <div className="report-tier-grid">
-            <article className="report-tier-card report-tier-card--daily">
-              <header><span>DAILY · 1 PAGE</span><small>适合今天</small></header>
-              <h3>Daily Report</h3>
-              <p>一页读完今天的综合主题、当前时运与可验证的小行动。</p>
-              <div className="report-tier-card__price"><strong>Preview</strong><span>公开测试 · 暂不出售</span></div>
-              <ul><li>今日综合主题与时间范围</li><li>最多 3 条可溯源命盘依据</li><li>1 个现实观察与反思提示</li><li>私人一页 PDF</li></ul>
-              <button className="button button--primary" type="button" disabled>购买尚未开放</button>
-              <a href="#daily-preview" className="text-link">先看一页预览 ↓</a>
-            </article>
+          <div className="report-selector__heading"><p className="eyebrow">FULL REPORT · 完整版</p><h2 id="report-selector-title">一个商品，不制造档位焦虑</h2><p>付款前先看目录与三个完整章节。购买按钮只有在付款验证、私人交付、恢复、退款和自动清理全部可用时才会开启。</p></div>
+          <div className="report-tier-grid report-tier-grid--single">
             <article className="report-tier-card report-tier-card--detailed">
-              <header><span>DETAILED · 10 PAGES</span><small>适合保存与复盘</small></header>
-              <h3>Detailed Report</h3>
+              <header><span>FULL · 10 PAGES</span><small>一次性购买</small></header>
+              <h3>Life Map Full Personal Report</h3>
               <p>把三套本命计算、当前时运、规则综合和七日练习整理成完整档案。</p>
-              <div className="report-tier-card__price"><strong>Preview</strong><span>公开测试 · 暂不出售</span></div>
+              <div className="report-tier-card__price"><strong>$2.00</strong><span>USD · PDF · 无订阅</span></div>
               <ul><li>八字、紫微与西占计算记录</li><li>跨体系共识、张力与证据</li><li>八个生命领域的反思主题</li><li>七日练习、方法与限制</li></ul>
-              <button className="button button--secondary" type="button" disabled>购买尚未开放</button>
+              <button className="button button--primary" type="button" disabled={launchState !== "available" || buying} onClick={purchase}>{purchaseLabel}</button>
               <a href="#detailed-preview" className="text-link">查看目录与章节预览 ↓</a>
             </article>
           </div>
-          <p className="report-checkout-note">公开测试阶段不会连接 Shopify 结账，也不会把姓名、生日、出生时间、地点、问题或命盘内容发送给 Shopify。</p>
-          <p className="inline-notice">BETA SAFETY · 购买暂时关闭。只有完成付款验证、个性化 PDF 交付、下载恢复与退款测试后才会重新开放。</p>
+          <p className="report-checkout-note">Shopify 只接收随机报告编号、一个商品、数量 1 与 USD $2.00。姓名、生日、出生时间、地点、问题、命盘内容和 PDF 都不会作为 Shopify 商品属性发送。</p>
+          {launchState !== "available" && <p className="inline-notice">PAID-LAUNCH GATE · 购买保持关闭，直到公开访问、Webhook、邮件、私人存储、自动清理与支持流程全部验证。</p>}
+          {purchaseError && <p className="inline-notice" role="alert">{purchaseError}</p>}
+          <Link href="/report/access" className="text-link">已经购买？恢复下载链接 →</Link>
         </section>
 
         <div className="report-boundary"><span>FACT</span><p>命盘事实来自版本化引擎</p><span>REFLECTION</span><p>传统主题是可质疑的观察角度</p><span>PRACTICE</span><p>练习不需要购买任何物品</p></div>
@@ -1180,7 +1216,7 @@ function ReportPage() {
             </article>
           ))}
         </section>
-        <section className="report-final-cta"><p className="eyebrow">PUBLIC BETA · PREVIEW ONLY</p><h2>先保存预览，购买稍后开放</h2><p>{detailedReport.disclaimer} 当前不会收款、创建订单或自动续费。</p><div className="report-final-cta__actions"><button className="button button--primary" type="button" disabled>Daily · 暂未开放</button><button className="button button--secondary" type="button" disabled>Detailed · 暂未开放</button></div><Link href="/digital-delivery" className="text-link">查看未来的数字交付与退款边界 →</Link></section>
+        <section className="report-final-cta"><p className="eyebrow">PRIVATE DELIVERY · $2 USD</p><h2>保存一份可以慢慢读的完整档案</h2><p>{detailedReport.disclaimer} 这是一次性数字商品，没有订阅或自动续费。</p><div className="report-final-cta__actions"><button className="button button--primary" type="button" disabled={launchState !== "available" || buying} onClick={purchase}>{purchaseLabel}</button></div><Link href="/digital-delivery" className="text-link">查看数字交付、保留期与退款边界 →</Link></section>
       </div>
     </PageShell>
   );
@@ -1232,7 +1268,7 @@ function MePage() {
         <section className="profile-card"><SectionHeader eyebrow="BIRTH PROFILE" title="出生信息" /><dl><div><dt>出生日期</dt><dd>{reading.profile.birthDate}</dd></div><div><dt>出生时间</dt><dd>{reading.profile.birthTime ?? "未知"}</dd></div><div><dt>出生地点</dt><dd>{reading.place.label}</dd></div><div><dt>时区</dt><dd>{reading.place.timeZone}</dd></div><div><dt>状态</dt><dd><span className="calculation-label">三体系计算完成</span></dd></div></dl><Link href="/onboarding" className="text-link">重新输入资料 →</Link></section>
         <section className="reflection-history" id="reflection-history"><SectionHeader eyebrow="YOUR THREADS" title="问题与行动" action={reflections.length ? `${reflections.length} 条记录` : undefined} />{reflections.length ? <div>{reflections.map((reflection) => <article key={reflection.id}><span>{focusOption(reflection.focus).label}</span><div><h3>{reflection.question}</h3><p>{reflection.action}</p><small>{reflection.reviewDate ? `计划复盘 ${reflection.reviewDate}` : "未设置复盘日期"}</small></div><button type="button" aria-label={`删除问题：${reflection.question}`} onClick={() => setReflections(removeReflection(reflection.id))}>删除</button></article>)}</div> : <div className="empty-thread"><p>还没有保存问题。完成一次决策反思后，你的行动和复盘日期会出现在这里。</p><Link href="/ask" className="button button--secondary">开始一个问题</Link></div>}<p className="reflection-history__privacy">当前阶段只保存在本次浏览器会话中。账号同步、跨设备记忆与提醒尚未启用。</p></section>
         <details className="profile-chart"><summary>查看我的四柱计算事实</summary><BaziChartCard reading={reading} /></details>
-        <section className="menu-list"><Link href="/report"><span>数字报告预览</span><small>Daily 与十页 Detailed · 公开测试阶段暂不出售</small><b>→</b></Link><Link href="/objects"><span>象征物商城</span><small>浏览天然石、五行手链与命盘艺术</small><b>→</b></Link><button disabled><span>关系档案</span><small>后续阶段开放</small><b>即将开放</b></button><button disabled><span>通知与每日提醒</span><small>后续阶段开放</small><b>即将开放</b></button></section>
+        <section className="menu-list"><Link href="/report"><span>十页私人报告</span><small>一份完整报告 · USD $2 · 安全门槛控制</small><b>→</b></Link><Link href="/objects"><span>象征物商城</span><small>浏览天然石、五行手链与命盘艺术</small><b>→</b></Link><button disabled><span>关系档案</span><small>后续阶段开放</small><b>即将开放</b></button><button disabled><span>通知与每日提醒</span><small>后续阶段开放</small><b>即将开放</b></button></section>
         <section className="trust-card"><p className="eyebrow">TRUST & PRIVACY</p><h2>你的信息，只留在这次浏览会话</h2><p>出生资料只保存在当前浏览器会话中，不会上传、写入账户或发送分析事件。关闭会话后浏览器会清除它。</p><ul><li>八字、紫微和西占由版本锁定的本地引擎计算</li><li>时运使用 {experience.calculatedFor} 的干支、紫微运限与行星角距快照</li><li>综合解释由规则生成，不调用实时 AI 或追踪</li></ul><button className="text-button text-button--danger" onClick={clearProfile}>清除本次出生资料</button></section>
       </div>
     </PageShell>

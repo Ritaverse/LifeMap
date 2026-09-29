@@ -744,6 +744,7 @@ h1, h2, h3, p { margin-top: 0; }
 .report-selector__heading h2 { margin-bottom: 10px; font-family: var(--font-editorial); font-size: clamp(30px, 5vw, 43px); font-weight: 450; }
 .report-selector__heading > p:last-child { font-size: 12px; }
 .report-tier-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.report-tier-grid--single { grid-template-columns: minmax(0, 620px); justify-content: center; }
 .report-tier-card { position: relative; display: flex; min-width: 0; flex-direction: column; padding: 28px; overflow: hidden; border: 1px solid var(--color-line); border-radius: var(--radius-xl); background: linear-gradient(145deg, rgb(42 27 72 / 88%), rgb(26 17 49 / 94%)); box-shadow: var(--shadow-soft), var(--shadow-inner); }
 .report-tier-card::after { position: absolute; top: -90px; right: -75px; width: 210px; height: 210px; border: 1px solid rgb(225 185 255 / 10%); border-radius: 50%; content: ""; }
 .report-tier-card--daily { border-color: rgb(142 216 237 / 29%); background: radial-gradient(circle at 100% 0, rgb(142 216 237 / 11%), transparent 38%), linear-gradient(145deg, rgb(37 52 81 / 82%), rgb(26 17 49 / 94%)); }

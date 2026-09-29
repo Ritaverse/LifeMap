@@ -1,80 +1,104 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+
 import {
-  CREATE_REPORT_CART_MUTATION,
+  createPrivateReportJob,
   createReportCheckout,
-  reportCartInput,
-  REPORT_PRODUCTS,
+  exchangeReportAccessToken,
+  getReportLaunchReadiness,
+  requestReportAccess,
 } from "../app/lib/shopify.ts";
+import {
+  FULL_REPORT_PRODUCT,
+  REPORT_SCHEMA_VERSION,
+  REPORT_JOB_LINE_ATTRIBUTE,
+} from "../app/lib/report-product.ts";
 
-test("each report cart contains only its product, quantity, and non-sensitive labels", () => {
-  for (const kind of ["daily", "detailed"]) {
-    const input = reportCartInput(kind);
-    const serialized = JSON.stringify(input);
-    assert.equal(input.lines[0].merchandiseId, REPORT_PRODUCTS[kind].variantId);
-    assert.equal(input.lines[0].quantity, 1);
-    assert.equal(input.attributes[0].value, REPORT_PRODUCTS[kind].reportKind);
-    assert.doesNotMatch(serialized, /birth|name|location|pillar|profile/i);
-  }
-  assert.match(CREATE_REPORT_CART_MUTATION, /cartCreate/);
-  assert.doesNotMatch(CREATE_REPORT_CART_MUTATION, /buyerIdentity|email|phone/);
+test("the catalog exposes one exact USD $2 full-report product", () => {
+  assert.deepEqual(FULL_REPORT_PRODUCT, {
+    key: "full-report-v1",
+    productId: "gid://shopify/Product/8295435862085",
+    variantId: "gid://shopify/ProductVariant/45796622925893",
+    variantNumericId: "45796622925893",
+    title: "Life Map Full Personal Report",
+    price: "2.00",
+    amountCents: 200,
+    currencyCode: "USD",
+    pages: 10,
+  });
+  assert.equal(REPORT_JOB_LINE_ATTRIBUTE, "_life_map_report_job_id");
 });
 
-test("checkout client verifies both live report amounts before returning Shopify URLs", async () => {
-  const previous = process.env.NEXT_PUBLIC_SHOPIFY_STOREFRONT_TOKEN;
-  process.env.NEXT_PUBLIC_SHOPIFY_STOREFRONT_TOKEN = "public-test-token";
-  try {
-    for (const kind of ["daily", "detailed"]) {
-      let requestBody;
-      const product = REPORT_PRODUCTS[kind];
-      const checkout = await createReportCheckout(kind, async (_url, init) => {
-        requestBody = JSON.parse(String(init?.body));
-        return new Response(JSON.stringify({ data: { cartCreate: {
-          cart: { checkoutUrl: `https://dj4xdu-gb.myshopify.com/checkouts/${kind}`, totalQuantity: 1, cost: { totalAmount: { amount: product.price, currencyCode: "USD" } } },
-          userErrors: [], warnings: [],
-        } } }), { status: 200, headers: { "content-type": "application/json" } });
-      });
-      assert.equal(checkout.kind, kind);
-      assert.equal(checkout.amount, product.price);
-      assert.equal(checkout.currencyCode, "USD");
-      assert.equal(checkout.source, "storefront-api");
-      assert.deepEqual(requestBody.variables.input, reportCartInput(kind));
-    }
-  } finally {
-    if (previous === undefined) delete process.env.NEXT_PUBLIC_SHOPIFY_STOREFRONT_TOKEN;
-    else process.env.NEXT_PUBLIC_SHOPIFY_STOREFRONT_TOKEN = previous;
-  }
+test("the client uploads finished PDF bytes only to the private report API", async () => {
+  const pdf = new TextEncoder().encode("%PDF-1.7\nprivate finished report\n%%EOF");
+  let requestUrl = "";
+  let requestInit;
+  const receipt = await createPrivateReportJob(pdf, async (input, init) => {
+    requestUrl = String(input);
+    requestInit = init;
+    return Response.json({
+      jobId: "11111111-1111-4111-8111-111111111111",
+      capability: "opaque-capability",
+      expiresAt: "2026-09-29T00:00:00.000Z",
+    }, { status: 201 });
+  });
+
+  assert.equal(requestUrl, "/api/report/jobs");
+  assert.equal(requestInit.method, "POST");
+  assert.equal(requestInit.headers["content-type"], "application/pdf");
+  assert.equal(requestInit.headers["x-life-map-pdf-pages"], "10");
+  assert.equal(requestInit.headers["x-life-map-report-schema"], REPORT_SCHEMA_VERSION);
+  assert.match(requestInit.headers["x-life-map-pdf-sha256"], /^[a-f0-9]{64}$/);
+  assert.equal(await requestInit.body.text(), new TextDecoder().decode(pdf));
+  assert.equal(receipt.capability, "opaque-capability");
+  assert.doesNotMatch(JSON.stringify(requestInit.headers), /name|birth|location|pillar|profile/i);
 });
 
-test("checkout client rejects price drift and unsafe redirect hosts", async () => {
-  const previous = process.env.NEXT_PUBLIC_SHOPIFY_STOREFRONT_TOKEN;
-  process.env.NEXT_PUBLIC_SHOPIFY_STOREFRONT_TOKEN = "public-test-token";
-  try {
-    await assert.rejects(() => createReportCheckout("daily", async () => new Response(JSON.stringify({ data: { cartCreate: {
-      cart: { checkoutUrl: "https://dj4xdu-gb.myshopify.com/checkouts/example", totalQuantity: 1, cost: { totalAmount: { amount: "2.99", currencyCode: "USD" } } },
-      userErrors: [], warnings: [],
-    } } }), { status: 200, headers: { "content-type": "application/json" } })), /unexpected report total/);
+test("checkout sends only an opaque job capability to the Life Map backend", async () => {
+  const job = {
+    jobId: "11111111-1111-4111-8111-111111111111",
+    capability: "opaque-capability",
+  };
+  let requestUrl = "";
+  let requestInit;
+  const checkout = await createReportCheckout(job, async (input, init) => {
+    requestUrl = String(input);
+    requestInit = init;
+    return Response.json({
+      checkoutUrl: "https://dj4xdu-gb.myshopify.com/checkouts/example",
+      amount: "2.00",
+      currencyCode: "USD",
+    });
+  });
 
-    await assert.rejects(() => createReportCheckout("detailed", async () => new Response(JSON.stringify({ data: { cartCreate: {
-      cart: { checkoutUrl: "https://example.com/pay", totalQuantity: 1, cost: { totalAmount: { amount: "19.99", currencyCode: "USD" } } },
-      userErrors: [], warnings: [],
-    } } }), { status: 200, headers: { "content-type": "application/json" } })), /unexpected checkout address/);
-  } finally {
-    if (previous === undefined) delete process.env.NEXT_PUBLIC_SHOPIFY_STOREFRONT_TOKEN;
-    else process.env.NEXT_PUBLIC_SHOPIFY_STOREFRONT_TOKEN = previous;
-  }
+  assert.equal(requestUrl, `/api/report/jobs/${job.jobId}/checkout`);
+  assert.equal(requestInit.method, "POST");
+  assert.equal(requestInit.headers.authorization, `Bearer ${job.capability}`);
+  assert.equal(requestInit.body, undefined);
+  assert.deepEqual(checkout, {
+    checkoutUrl: "https://dj4xdu-gb.myshopify.com/checkouts/example",
+    amount: "2.00",
+    currencyCode: "USD",
+  });
 });
 
-test("protected-store fallbacks use the correct Shopify cart permalink", async () => {
-  const previous = process.env.NEXT_PUBLIC_SHOPIFY_STOREFRONT_TOKEN;
-  delete process.env.NEXT_PUBLIC_SHOPIFY_STOREFRONT_TOKEN;
-  try {
-    const daily = await createReportCheckout("daily");
-    const detailed = await createReportCheckout("detailed");
-    assert.equal(daily.source, "cart-permalink");
-    assert.match(daily.checkoutUrl, /^https:\/\/dj4xdu-gb\.myshopify\.com\/cart\/45812444725317:1/);
-    assert.match(detailed.checkoutUrl, /^https:\/\/dj4xdu-gb\.myshopify\.com\/cart\/45796622925893:1/);
-  } finally {
-    if (previous !== undefined) process.env.NEXT_PUBLIC_SHOPIFY_STOREFRONT_TOKEN = previous;
-  }
+test("readiness fails closed and access secrets stay out of URLs", async () => {
+  assert.deepEqual(await getReportLaunchReadiness(async () => new Response("offline", { status: 503 })), { available: false });
+
+  const requests = [];
+  const fetcher = async (input, init) => {
+    requests.push({ input: String(input), init });
+    return Response.json({ accepted: true });
+  };
+  await requestReportAccess("#1001", "reader@example.test", fetcher);
+  await exchangeReportAccessToken("a".repeat(64), fetcher);
+
+  assert.deepEqual(requests.map((request) => request.input), [
+    "/api/report/access/request",
+    "/api/report/access/exchange",
+  ]);
+  assert.equal(requests.some((request) => request.input.includes("reader@example.test")), false);
+  assert.equal(requests.some((request) => request.input.includes("a".repeat(64))), false);
+  assert.match(String(requests[0].init.body), /reader@example\.test/);
+  assert.match(String(requests[1].init.body), new RegExp("a{64}"));
 });
