@@ -48,9 +48,29 @@ test("the client uploads finished PDF bytes only to the private report API", asy
   assert.equal(requestInit.headers["content-type"], "application/pdf");
   assert.equal(requestInit.headers["x-life-map-pdf-pages"], "10");
   assert.equal(requestInit.headers["x-life-map-report-schema"], REPORT_SCHEMA_VERSION);
+  assert.equal(requestInit.headers["x-life-map-report-locale"], "zh-CN");
   assert.match(requestInit.headers["x-life-map-pdf-sha256"], /^[a-f0-9]{64}$/);
   assert.equal(await requestInit.body.text(), new TextDecoder().decode(pdf));
   assert.equal(receipt.capability, "opaque-capability");
+  assert.equal(receipt.locale, "zh-CN");
+  assert.doesNotMatch(JSON.stringify(requestInit.headers), /name|birth|location|pillar|profile/i);
+});
+
+test("the client sends only a canonical non-sensitive report locale", async () => {
+  const pdf = new TextEncoder().encode("%PDF-1.7\nprivate English report\n%%EOF");
+  let requestInit;
+  const receipt = await createPrivateReportJob(pdf, "en", async (_input, init) => {
+    requestInit = init;
+    return Response.json({
+      jobId: "22222222-2222-4222-8222-222222222222",
+      capability: "opaque-capability",
+      expiresAt: "2026-09-29T00:00:00.000Z",
+      locale: "en",
+    }, { status: 201 });
+  });
+
+  assert.equal(requestInit.headers["x-life-map-report-locale"], "en");
+  assert.equal(receipt.locale, "en");
   assert.doesNotMatch(JSON.stringify(requestInit.headers), /name|birth|location|pillar|profile/i);
 });
 
@@ -88,10 +108,10 @@ test("readiness fails closed and access secrets stay out of URLs", async () => {
   const requests = [];
   const fetcher = async (input, init) => {
     requests.push({ input: String(input), init });
-    return Response.json({ accepted: true });
+    return Response.json(String(input).endsWith("/exchange") ? { available: true, locale: "en" } : { accepted: true });
   };
   await requestReportAccess("#1001", "reader@example.test", fetcher);
-  await exchangeReportAccessToken("a".repeat(64), fetcher);
+  assert.deepEqual(await exchangeReportAccessToken("a".repeat(64), fetcher), { available: true, locale: "en" });
 
   assert.deepEqual(requests.map((request) => request.input), [
     "/api/report/access/request",

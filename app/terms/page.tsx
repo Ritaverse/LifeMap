@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import { PublicTrustLayout } from "../ui/PublicTrustLayout";
 
 export const metadata: Metadata = {
-  title: "使用条款",
-  description: "Life Map 公开测试版的使用范围、反思性质、责任边界与可接受使用说明。",
+  title: "Terms of Use · 使用条款",
+  description: "Scope, reflective purpose, responsibility boundaries, and acceptable use for the Life Map public beta. Life Map 公开测试版使用说明。",
   alternates: { canonical: "/terms" },
 };
 
@@ -14,6 +14,34 @@ export default function TermsPage() {
       eyebrow="Terms · 使用条款"
       title="把它当作一面镜子，而不是答案机器"
       summary="使用 Life Map 即表示你理解：它结合传统命理与占星体系提供反思材料，不是科学测评、事实预测或专业建议。"
+      eyebrowEn="Terms of Use"
+      titleEn="Use it as a mirror, not an answer machine"
+      summaryEn="By using Life Map, you understand that it combines traditional destiny and astrology systems as material for reflection—not scientific assessment, factual prediction, or professional advice."
+      englishChildren={<>
+        <section>
+          <h2>What the service is</h2>
+          <p>Life Map uses versioned deterministic calculations to present BaZi, Zi Wei Dou Shu, Western astrology, and current timing facts, then connects traditional observations and reflection prompts through rule templates. The current version does not call live AI.</p>
+          <p>These systems have cultural and interpretive traditions, but they are not scientifically validated causal relationships. Themes, tendencies, and prompts on the site cannot guarantee an outcome.</p>
+        </section>
+        <section>
+          <h2>Not a substitute for professional judgment</h2>
+          <p>Life Map does not provide medical, mental-health, legal, financial, investment, fertility, safety, or emergency advice. Do not make high-risk decisions based only on chart, timing, astrology, or I Ching content. Contact a qualified professional or local emergency service when needed.</p>
+        </section>
+        <section>
+          <h2>Use it responsibly</h2>
+          <ul><li>Submit only information you have the right to use; do not enter another person’s sensitive information without permission.</li><li>Do not use the service to harass, deceive, or discriminate, or claim its content guarantees destiny or outcomes.</li><li>Do not disrupt, attack, reverse engineer, or automate abuse of the site or services.</li><li>Independently verify birth details and real-world information; incorrect input changes calculation results.</li></ul>
+        </section>
+        <section>
+          <h2>Beta service and content rights</h2>
+          <p>The public beta may change, pause, or remove features. Life Map interface, brand, explanatory copy, and original visuals are protected by applicable intellectual-property rules; you retain lawful rights in your own input.</p>
+          <aside><p><strong>Digital report:</strong> the only paid report is a one-time ten-page PDF for USD $2.00, with no subscription or automatic renewal. Purchase opens only after payment verification, private delivery, recovery, refunds, and cleanup are ready.</p></aside>
+        </section>
+        <section>
+          <h2>Changes and contact</h2>
+          <p>Material changes will be reflected here before the relevant feature opens. Questions can be directed to the <a href="/support">support page</a>.</p>
+          <p><time dateTime="2026-09-28">Updated September 28, 2026</time></p>
+        </section>
+      </>}
     >
       <section>
         <h2>服务是什么</h2>

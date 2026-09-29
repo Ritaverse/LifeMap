@@ -121,7 +121,7 @@ async function call(request) {
   return response;
 }
 
-async function createJob({ checkout = true, clientIp, testKey } = {}) {
+async function createJob({ checkout = true, clientIp, testKey, locale } = {}) {
   const pdf = testPdf();
   const createResponse = await call(new Request(`${SITE_ORIGIN}/api/report/jobs`, {
     method: "POST",
@@ -132,6 +132,7 @@ async function createJob({ checkout = true, clientIp, testKey } = {}) {
       "x-life-map-pdf-pages": String(FULL_REPORT_PRODUCT.pages),
       "x-life-map-report-schema": REPORT_SCHEMA_VERSION,
       "x-life-map-pdf-sha256": sha256(pdf),
+      ...(locale ? { "x-life-map-report-locale": locale } : {}),
       ...(testKey ? { "x-life-map-test-key": testKey } : {}),
     },
     body: pdf,
@@ -356,8 +357,11 @@ test("successful $2 paid order delivers one private PDF and enforces one-use acc
   assert.equal(delivered.shopify_order_id, "success-order");
   assert.equal(delivered.expected_amount_cents, 200);
   assert.equal(delivered.expected_currency, "USD");
+  assert.equal(delivered.locale, "zh-CN");
   assert.equal(emails.length, 1);
   assert.equal(emails[0].body.to[0], "buyer@example.com");
+  assert.equal(emails[0].body.subject, "你的 Life Map 私人报告已准备好");
+  assert.match(emails[0].body.text, /数字交付与退款条款/);
   assert.equal(emails[0].init.headers["idempotency-key"], "report-paid-success-order");
 
   const outbox = await db.prepare("SELECT * FROM delivery_outbox WHERE job_id = ?").bind(job.jobId).first();
@@ -367,6 +371,7 @@ test("successful $2 paid order delivers one private PDF and enforces one-use acc
 
   const exchangeResponse = await exchange(paid.token);
   assert.equal(exchangeResponse.status, 200);
+  assert.deepEqual(await exchangeResponse.clone().json(), { available: true, locale: "zh-CN" });
   const cookie = sessionCookie(exchangeResponse);
   assert.equal((await exchange(paid.token)).status, 410, "email link tokens are single use");
 
@@ -392,6 +397,58 @@ test("successful $2 paid order delivers one private PDF and enforces one-use acc
   `).bind(job.jobId, job.jobId).first();
   assert.equal(counts.token_count, 2);
   assert.equal(counts.outbox_count, 1);
+});
+
+test("English report jobs preserve locale through initial delivery and access recovery", async () => {
+  const job = await createJob({ locale: "en" });
+  assert.equal(job.locale, "en");
+  assert.equal((await jobRow(job.jobId)).locale, "en");
+  assert.equal(shopifyRequests.length, 1);
+  assert.doesNotMatch(JSON.stringify(shopifyRequests[0].body.variables), /locale|language/i);
+
+  const paid = await pay(job, { id: "english-order", name: "#1101", lineItemId: "english-line" });
+  assert.equal(emails[0].body.subject, "Your private Life Map report is ready");
+  assert.match(emails[0].body.text, /Digital delivery and refund terms/);
+  assert.match(emails[0].body.html, /Open your secure report access page/);
+  const access = await exchange(paid.token);
+  assert.deepEqual(await access.json(), { available: true, locale: "en" });
+
+  const recovery = await call(new Request(`${SITE_ORIGIN}/api/report/access/request`, {
+    method: "POST",
+    headers: {
+      "cf-connecting-ip": "203.0.113.44",
+      "content-type": "application/json",
+      origin: SITE_ORIGIN,
+    },
+    body: JSON.stringify({ orderNumber: "1101", email: "buyer@example.com" }),
+  }));
+  assert.equal(recovery.status, 202);
+  assert.equal(emails.length, 2);
+  assert.equal(emails[1].body.subject, "Your secure Life Map report access link");
+  assert.match(emails[1].body.text, /new secure Life Map report access link/);
+});
+
+test("report job locale rejects unsupported values while old clients default to Chinese", async () => {
+  const defaultJob = await createJob({ checkout: false });
+  assert.equal(defaultJob.locale, "zh-CN");
+  assert.equal((await jobRow(defaultJob.jobId)).locale, "zh-CN");
+
+  const pdf = testPdf();
+  const response = await call(new Request(`${SITE_ORIGIN}/api/report/jobs`, {
+    method: "POST",
+    headers: {
+      "cf-connecting-ip": "203.0.113.45",
+      "content-type": "application/pdf",
+      origin: SITE_ORIGIN,
+      "x-life-map-pdf-pages": String(FULL_REPORT_PRODUCT.pages),
+      "x-life-map-report-schema": REPORT_SCHEMA_VERSION,
+      "x-life-map-pdf-sha256": sha256(pdf),
+      "x-life-map-report-locale": "fr",
+    },
+    body: pdf,
+  }));
+  assert.equal(response.status, 422);
+  assert.deepEqual(await response.json(), { error: "报告语言不受支持。" });
 });
 
 test("checkout failures remain retriable and do not create paid entitlement", async () => {

@@ -66,6 +66,12 @@
   font-weight: 650;
 }
 
+.topbarActions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .main {
   padding-block: clamp(64px, 9vw, 104px) 88px;
 }
@@ -268,7 +274,7 @@
 }
 
 @media (max-width: 560px) {
-  .homeLink span {
+  .homeLink {
     display: none;
   }
 

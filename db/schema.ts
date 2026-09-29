@@ -14,6 +14,7 @@ export const reportJobs = sqliteTable("report_jobs", {
   pdfSizeBytes: integer("pdf_size_bytes"),
   pdfPageCount: integer("pdf_page_count"),
   reportSchemaVersion: text("report_schema_version").notNull(),
+  locale: text("locale").notNull().default("zh-CN"),
   jobCapabilityHash: text("job_capability_hash"),
   checkoutUrlCiphertext: blob("checkout_url_ciphertext", { mode: "buffer" }),
   checkoutUrlNonce: blob("checkout_url_nonce", { mode: "buffer" }),
@@ -42,6 +43,7 @@ export const reportJobs = sqliteTable("report_jobs", {
   check("report_jobs_currency_check", sql`${table.expectedCurrency} = 'USD'`),
   check("report_jobs_size_check", sql`${table.pdfSizeBytes} IS NULL OR ${table.pdfSizeBytes} BETWEEN 1024 AND 5242880`),
   check("report_jobs_pages_check", sql`${table.pdfPageCount} IS NULL OR ${table.pdfPageCount} = 10`),
+  check("report_jobs_locale_check", sql`${table.locale} IN ('zh-CN','en')`),
   index("report_jobs_expiry_idx").on(table.status, table.expiresAt),
   index("report_jobs_recovery_idx").on(table.shopifyOrderNumber, table.buyerEmailHmac),
 ]);

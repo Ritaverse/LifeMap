@@ -382,7 +382,7 @@ export async function renderLifeMapReportPdf(
   pdf.setKeywords(["Life Map", "personal reflection", "BaZi", "Zi Wei Dou Shu", "astrology"]);
   pdf.setCreationDate(metadataDate);
   pdf.setModificationDate(metadataDate);
-  pdf.catalog.set(PDFName.of("Lang"), PDFString.of("zh-CN"));
+  pdf.catalog.set(PDFName.of("Lang"), PDFString.of(report.locale));
 
   report.pages.forEach((model) => {
     const page = pdf.addPage([A4_WIDTH, A4_HEIGHT]);

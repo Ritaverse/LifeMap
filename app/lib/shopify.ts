@@ -1,4 +1,5 @@
 import { FULL_REPORT_PRODUCT, REPORT_SCHEMA_VERSION } from "./report-product.ts";
+import type { AppLocale } from "./locale.ts";
 
 export interface ReportLaunchReadiness {
   available: boolean;
@@ -8,6 +9,7 @@ export interface ReportJobReceipt {
   jobId: string;
   capability: string;
   expiresAt: string;
+  locale: AppLocale;
 }
 
 export interface ReportCheckout {
@@ -39,10 +41,22 @@ export async function getReportLaunchReadiness(fetcher: typeof fetch = fetch): P
   return { available: body.available === true };
 }
 
+export function createPrivateReportJob(
+  pdf: Uint8Array,
+  fetcher?: typeof fetch,
+): Promise<ReportJobReceipt>;
+export function createPrivateReportJob(
+  pdf: Uint8Array,
+  locale: AppLocale,
+  fetcher?: typeof fetch,
+): Promise<ReportJobReceipt>;
 export async function createPrivateReportJob(
   pdf: Uint8Array,
-  fetcher: typeof fetch = fetch,
+  localeOrFetcher: AppLocale | typeof fetch = "zh-CN",
+  providedFetcher: typeof fetch = fetch,
 ): Promise<ReportJobReceipt> {
+  const locale = typeof localeOrFetcher === "function" ? "zh-CN" : localeOrFetcher;
+  const fetcher = typeof localeOrFetcher === "function" ? localeOrFetcher : providedFetcher;
   const digest = await crypto.subtle.digest("SHA-256", new Uint8Array(pdf));
   const sha256 = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
   const response = await fetcher("/api/report/jobs", {
@@ -52,11 +66,13 @@ export async function createPrivateReportJob(
       "x-life-map-pdf-sha256": sha256,
       "x-life-map-pdf-pages": String(FULL_REPORT_PRODUCT.pages),
       "x-life-map-report-schema": REPORT_SCHEMA_VERSION,
+      "x-life-map-report-locale": locale,
     },
     body: new Blob([new Uint8Array(pdf)], { type: "application/pdf" }),
   });
   if (!response.ok) throw await apiError(response, "私人报告暂时无法安全保存，请稍后重试。");
-  return response.json() as Promise<ReportJobReceipt>;
+  const receipt = await response.json() as Omit<ReportJobReceipt, "locale"> & { locale?: AppLocale };
+  return { ...receipt, locale: receipt.locale ?? locale };
 }
 
 export async function createReportCheckout(
@@ -87,11 +103,12 @@ export async function requestReportAccess(
   if (!response.ok) throw await apiError(response, "暂时无法提交恢复请求，请稍后重试。");
 }
 
-export async function exchangeReportAccessToken(token: string, fetcher: typeof fetch = fetch): Promise<void> {
+export async function exchangeReportAccessToken(token: string, fetcher: typeof fetch = fetch): Promise<{ available?: boolean; locale?: AppLocale }> {
   const response = await fetcher("/api/report/access/exchange", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ token }),
   });
   if (!response.ok) throw await apiError(response, "这个下载链接无效或已经过期。");
+  return response.json() as Promise<{ available?: boolean; locale?: AppLocale }>;
 }

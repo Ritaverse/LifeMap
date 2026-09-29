@@ -1,5 +1,7 @@
-import type { BaziPillar, FiveElement } from "./bazi";
-import type { CalculatedExperience } from "./experience";
+import type { BaziPillar, FiveElement } from "./bazi.ts";
+import { fiveElementLabel, polarityLabel } from "./chart-terminology.ts";
+import type { CalculatedExperience } from "./experience.ts";
+import type { AppLocale } from "./locale.ts";
 
 export type ReportContentKind = "calculated-fact" | "traditional-reflection" | "practice" | "methodology";
 
@@ -21,6 +23,7 @@ export interface ReportPage {
 }
 
 export interface LifeMapReport {
+  locale: AppLocale;
   id: string;
   title: string;
   owner: string;
@@ -39,6 +42,15 @@ const traditionalLenses: Record<FiveElement, { title: string; body: string; prom
 };
 
 const systemNames = { bazi: "八字", ziwei: "紫微", astrology: "西占" } as const;
+const systemNamesEn = { bazi: "BaZi", ziwei: "Zi Wei", astrology: "Western astrology" } as const;
+
+const englishLenses: Record<FiveElement, { title: string; body: string; prompt: string }> = {
+  木: { title: "Growth and adjustment", body: "Wood is traditionally associated with growth, direction, and flexibility. Here it is a language for observation, not a fixed conclusion about personality or the future.", prompt: "What deserves continued cultivation, and what direction now needs pruning?" },
+  火: { title: "Expression and visibility", body: "Fire is traditionally associated with expression, warmth, and illumination. It is not equated with extroversion and does not predict outcomes.", prompt: "What deserves to be expressed more clearly today?" },
+  土: { title: "Capacity and steadiness", body: "Earth is traditionally associated with support, boundaries, and integration. This is a reflective lens, not a score of ability or destiny.", prompt: "What are you carrying, and which part truly belongs to you?" },
+  金: { title: "Discernment and choice", body: "Metal is traditionally associated with boundaries, judgment, and refinement. Choice is treated as a practice, not as good or bad fortune.", prompt: "If you kept only what matters most, what would remain?" },
+  水: { title: "Perception and flow", body: "Water is traditionally associated with perception, exploration, and flow. It does not predict change; it invites you to notice how information enters and leaves.", prompt: "Which question deserves more listening before it is answered?" },
+};
 
 function pillarLine(pillar: BaziPillar | null, fallback: string) {
   if (!pillar) return `${fallback}：出生时间未知，本报告不推算这一柱。`;
@@ -51,7 +63,7 @@ function formatGeneratedOn(value: Date | string) {
   return date;
 }
 
-export function buildDailyReport(experience: CalculatedExperience, generatedOn: Date | string = new Date()): LifeMapReport {
+export function buildDailyReport(experience: CalculatedExperience, generatedOn: Date | string = new Date(), locale: AppLocale = experience.locale): LifeMapReport {
   const date = formatGeneratedOn(generatedOn);
   const { bazi, timing, todayInsight } = experience;
   const evidence = todayInsight.evidence.map((reference) => {
@@ -61,7 +73,33 @@ export function buildDailyReport(experience: CalculatedExperience, generatedOn: 
   });
   const evidenceSystems = [...new Set(evidence.map(({ fact }) => systemNames[fact.system]))].join("、");
 
+  if (locale === "en") {
+    const englishSystems = [...new Set(evidence.map(({ fact }) => systemNamesEn[fact.system]))].join(", ");
+    return {
+      locale,
+      id: `life-map-daily-report-${experience.schemaVersion}-${experience.calculatedFor}`,
+      title: "Daily Reflection Report",
+      owner: bazi.profile.displayName,
+      generatedOn: date,
+      engineLabel: `${experience.engine.id} v${experience.engine.version} · ${experience.schemaVersion}`,
+      disclaimer: "This report supports personal reflection and exploration of traditional systems. It is not scientific prediction or medical, legal, financial, fertility, mortality, or safety advice.",
+      pages: [{
+        id: "daily", number: 1, eyebrow: "LIFE MAP DAILY · PRIVATE EDITION",
+        title: `${experience.calculatedFor} · ${todayInsight.title}`,
+        subtitle: todayInsight.subtitle,
+        blocks: [
+          { id: "daily-theme", kind: "traditional-reflection", label: `${todayInsight.kind.toUpperCase()} · ${englishSystems}`, title: "Today’s synthesis", body: todayInsight.summary },
+          { id: "daily-timing", kind: "calculated-fact", label: "DATED TIMING FACT", title: `${timing.title} · ${timing.start}—${timing.end}`, body: timing.facts.map((fact) => `${systemNamesEn[fact.system]}: ${fact.rawLabel}`).join("; ") },
+          ...evidence.slice(0, 3).map(({ reference, fact }) => ({ id: `daily-${fact.id}`, kind: "calculated-fact" as const, label: `${systemNamesEn[fact.system]} · EVIDENCE`, title: fact.label, body: `${reference.contribution} ${fact.rawLabel}` })),
+          { id: "daily-practice", kind: "practice", label: "TODAY’S PRACTICE", title: todayInsight.reflectionPrompt, body: "Write your most direct answer, then add one real-world fact you can observe or verify today." },
+          { id: "daily-boundary", kind: "methodology", label: "READING BOUNDARY", title: "A snapshot is not a prediction", body: `${timing.disclaimer} Calculated facts, traditional themes, and practice prompts remain clearly separated.` },
+        ],
+      }],
+    };
+  }
+
   return {
+    locale,
     id: `life-map-daily-report-${experience.schemaVersion}-${experience.calculatedFor}`,
     title: "今日反思报告",
     owner: bazi.profile.displayName,
@@ -85,8 +123,9 @@ export function buildDailyReport(experience: CalculatedExperience, generatedOn: 
   };
 }
 
-export function buildLifeMapReport(experience: CalculatedExperience, generatedOn: Date | string = new Date()): LifeMapReport {
+export function buildLifeMapReport(experience: CalculatedExperience, generatedOn: Date | string = new Date(), locale: AppLocale = experience.locale): LifeMapReport {
   const date = formatGeneratedOn(generatedOn);
+  if (locale === "en") return buildEnglishLifeMapReport(experience, date);
   const { bazi, ziwei, western, timing, todayInsight } = experience;
   const lens = traditionalLenses[bazi.dayMaster.element];
   const elementSummary = Object.entries(bazi.visibleElementCounts).map(([element, count]) => `${element} ${count}`).join(" · ");
@@ -108,6 +147,7 @@ export function buildLifeMapReport(experience: CalculatedExperience, generatedOn
   const evidenceSystems = [...new Set(todayInsight.evidence.map((item) => systemNames[item.system]))].join("、");
 
   return {
+    locale,
     id: `life-map-report-${experience.schemaVersion}-${experience.calculatedFor}`,
     title: "十页跨体系详细报告",
     owner: bazi.profile.displayName,
@@ -194,6 +234,127 @@ export function buildLifeMapReport(experience: CalculatedExperience, generatedOn
           ...experience.limitations.slice(0, 5).map((body, index) => ({ id: `caveat-${index + 1}`, kind: "methodology" as const, label: "CAVEAT", title: `限制 ${index + 1}`, body })),
           { id: "appendix-location", kind: "calculated-fact", label: "LOCATION RECORD", title: bazi.place.label, body: `${bazi.place.timeZone} · ${bazi.place.latitude.toFixed(4)}, ${bazi.place.longitude.toFixed(4)}。地点只在当前浏览器会话中用于计算。` },
           { id: "appendix-engine", kind: "calculated-fact", label: "ENGINE RECORD", title: experience.schemaVersion, body: `${bazi.schemaVersion} · ${ziwei.schemaVersion} · ${western.schemaVersion} · ${experience.schemaVersion}；${experience.engine.id} v${experience.engine.version}；计算日期 ${experience.calculatedFor}；报告日期 ${date}。` },
+        ],
+      },
+    ],
+  };
+}
+
+function pillarLineEn(pillar: BaziPillar | null, fallback: string) {
+  if (!pillar) return `${fallback}: birth time is unknown, so this pillar is not calculated.`;
+  return `${fallback} ${pillar.ganZhi}; heavenly stem ${pillar.stem}, earthly branch ${pillar.branch}; visible elements ${pillar.elements.map((element) => fiveElementLabel(element, "en")).join(", ")}.`;
+}
+
+function buildEnglishLifeMapReport(experience: CalculatedExperience, date: string): LifeMapReport {
+  const { bazi, ziwei, western, timing, todayInsight } = experience;
+  const lens = englishLenses[bazi.dayMaster.element];
+  const elementSummary = Object.entries(bazi.visibleElementCounts).map(([element, count]) => `${fiveElementLabel(element as FiveElement, "en")} ${count}`).join(" · ");
+  const pillars = [
+    pillarLineEn(bazi.pillars.year, "Year Pillar"),
+    pillarLineEn(bazi.pillars.month, "Month Pillar"),
+    pillarLineEn(bazi.pillars.day, "Day Pillar"),
+    pillarLineEn(bazi.pillars.time, "Time Pillar"),
+  ];
+  const ziweiCore = ziwei.status === "calculated"
+    ? `Life Palace (命宫) is at ${ziwei.soulPalaceBranch}; Body Palace (身宫) is at ${ziwei.bodyPalaceBranch}; Life Ruler ${ziwei.soulStar}; Body Ruler ${ziwei.bodyStar}; ${ziwei.fiveElementsClass}.`
+    : "Birth time is unknown, so the Life Palace, Body Palace, and twelve palaces are not calculated.";
+  const ziweiPalaces = ziwei.palaces.slice(0, 6).map((palace) => `${palace.name} ${palace.heavenlyStem}${palace.earthlyBranch}: ${palace.majorStars.map((star) => star.name).join(", ") || "no major star"}`).join("; ");
+  const westernCore = western.placements.slice(0, 5).map((placement) => `${placement.body} ${placement.sign} ${placement.degree}°${String(placement.minute).padStart(2, "0")}′${placement.house ? ` / H${placement.house}` : ""}`).join("; ");
+  const angles = western.angles.ascendant && western.angles.midheaven
+    ? `Ascendant ${western.angles.ascendant.sign} ${western.angles.ascendant.degree}°; Midheaven ${western.angles.midheaven.sign} ${western.angles.midheaven.degree}°.`
+    : "Birth time is unknown, so the Ascendant, Midheaven, and houses are not calculated.";
+  const strongestAspects = western.aspects.slice(0, 4).map((aspect) => `${aspect.bodyA} ${aspect.type} ${aspect.bodyB} (${aspect.orb.toFixed(2)}° orb)`).join("; ");
+  const evidenceSystems = [...new Set(todayInsight.evidence.map((item) => systemNamesEn[item.system]))].join(", ");
+
+  return {
+    locale: "en",
+    id: `life-map-report-${experience.schemaVersion}-${experience.calculatedFor}`,
+    title: "Ten-page cross-system report",
+    owner: bazi.profile.displayName,
+    generatedOn: date,
+    engineLabel: `${bazi.engine.id} v${bazi.engine.version} · ${ziwei.engine.id} v${ziwei.engine.version} · ${western.engine.id} v${western.engine.version} · ${experience.engine.id} v${experience.engine.version}`,
+    disclaimer: "This report supports personal reflection and exploration of traditional systems. It is not scientific prediction or medical, legal, financial, fertility, mortality, or safety advice.",
+    pages: [
+      {
+        id: "cover", number: 1, eyebrow: "LIFE MAP · PRIVATE EDITION", title: `${bazi.profile.displayName}’s Life Map`,
+        subtitle: "BaZi × Zi Wei × Western astrology × current timing × traceable rule synthesis",
+        blocks: [
+          { id: "cover-day-master", kind: "calculated-fact", label: "CALCULATED FACT", title: `Day Master ${bazi.dayMaster.stem} · ${polarityLabel(bazi.dayMaster.polarity, "en")} · ${fiveElementLabel(bazi.dayMaster.element, "en")}`, body: `Calculated for ${experience.calculatedFor}; ${ziwei.status === "calculated" ? "Zi Wei twelve-palace chart included" : "Zi Wei omitted because birth time is unknown"}; Western chart is ${western.completeness === "timed-chart" ? "a timed natal chart with houses" : "a date-only planetary chart"}.` },
+          { id: "cover-boundary", kind: "methodology", label: "READING BOUNDARY", title: "Facts, traditional interpretation, and synthesis stay separate", body: "Stems and branches, palace stars, planetary longitudes, and angular distances are calculated facts. Theme language is a contestable traditional lens, not a guaranteed outcome." },
+        ],
+      },
+      {
+        id: "method", number: 2, eyebrow: "01 · METHOD", title: "How this report is made", subtitle: "Calculate first, then connect evidence; every layer has a boundary.",
+        blocks: [
+          { id: "method-local", kind: "methodology", label: "PRIVATE BY DESIGN", title: "Raw birth data never enters the store", body: "The birth form and chart JSON stay in this browser. Only the finished private PDF is uploaded to Life Map delivery storage. Shopify receives a random report ID—not your name, birth details, location, or chart content." },
+          { id: "method-engines", kind: "calculated-fact", label: "VERSIONED ENGINES", title: "Four reproducible outputs", body: `${bazi.engine.id} v${bazi.engine.version}; ${ziwei.engine.id} v${ziwei.engine.version}; ${western.engine.id} v${western.engine.version}; ${experience.engine.id} v${experience.engine.version}.` },
+          { id: "method-synthesis", kind: "methodology", label: "RULE SYNTHESIS", title: "The synthesis is not live AI", body: "The rules layer only connects stable fact IDs in this report. A theme is marked as consensus only when two or more systems point toward it; disagreement remains visible as tension." },
+        ],
+      },
+      {
+        id: "pillars", number: 3, eyebrow: "02 · BAZI", title: "Four Pillars and visible Five Elements", subtitle: elementSummary,
+        blocks: [
+          ...pillars.map((body, index) => ({ id: `pillar-${index + 1}`, kind: "calculated-fact" as const, label: "CALCULATED FACT", title: ["Year Pillar", "Month Pillar", "Day Pillar", "Time Pillar"][index], body })),
+          { id: "elements-limit", kind: "methodology", label: "LIMITATION", title: "Counts are not strength scores", body: "Only visible heavenly stems and earthly branches are counted. Hidden-stem weighting, favorable elements, and fortune are not calculated, and a lower count is not described as a defect." },
+        ],
+      },
+      {
+        id: "ziwei", number: 4, eyebrow: "03 · ZI WEI", title: "Zi Wei twelve-palace chart", subtitle: ziwei.status === "calculated" ? `${ziwei.lunarDate} · ${ziwei.chineseDate}` : "Birth time is insufficient; unknown values stay blank",
+        blocks: [
+          { id: "ziwei-core", kind: "calculated-fact", label: "CALCULATED FACT", title: "Life Palace, Body Palace, and Five Elements class", body: ziweiCore },
+          { id: "ziwei-palaces", kind: "calculated-fact", label: "PALACE RECORD", title: "First six palace records", body: ziweiPalaces || "No palace records are available." },
+          { id: "ziwei-boundary", kind: "methodology", label: "LIMITATION", title: "Chart facts are not event conclusions", body: ziwei.status === "calculated" ? "Palaces and major stars are recorded without automatically judging configurations, dignity, or outcomes." : "The twelve palaces are omitted rather than invented from a substitute birth time." },
+        ],
+      },
+      {
+        id: "western", number: 5, eyebrow: "04 · WESTERN NATAL", title: "Western natal chart", subtitle: "Tropical zodiac · whole-sign houses · historical IANA time zone",
+        blocks: [
+          { id: "western-planets", kind: "calculated-fact", label: "PLANET POSITIONS", title: "Principal planetary positions", body: westernCore },
+          { id: "western-angles", kind: "calculated-fact", label: "ANGLES", title: "Angles and houses", body: angles },
+          { id: "western-aspects", kind: "calculated-fact", label: "ASPECTS", title: "Closest major aspects", body: strongestAspects || "No major aspect falls within the configured orb." },
+          { id: "western-boundary", kind: "methodology", label: "LIMITATION", title: "Position is calculation; meaning is traditional language", body: western.completeness === "timed-chart" ? "Uses a tropical zodiac and whole-sign houses. Interpretations remain reflective rather than predictive." : "Birth time is unknown, so angles and houses are not used." },
+        ],
+      },
+      {
+        id: "timing", number: 6, eyebrow: "05 · CURRENT TIMING", title: `${experience.calculatedFor} · ${timing.title}`, subtitle: `${timing.start} — ${timing.end}`,
+        blocks: [
+          ...timing.facts.map((fact) => ({ id: `report-${fact.id}`, kind: "calculated-fact" as const, label: `${systemNamesEn[fact.system]} · CURRENT FACT`, title: fact.label, body: `${fact.rawLabel} ${fact.limitations ?? ""}` })),
+          { id: "timing-boundary", kind: "methodology", label: "TIMING BOUNDARY", title: "A snapshot is not a prediction", body: timing.disclaimer },
+        ],
+      },
+      {
+        id: "synthesis", number: 7, eyebrow: "06 · SYNTHESIS", title: todayInsight.title, subtitle: todayInsight.subtitle,
+        blocks: [
+          { id: "synthesis-summary", kind: "traditional-reflection", label: `${todayInsight.kind.toUpperCase()} · ${evidenceSystems}`, title: "Today’s synthesis", body: todayInsight.summary },
+          ...todayInsight.evidence.map((reference) => {
+            const fact = experience.facts.find((item) => item.id === reference.factId);
+            if (!fact) throw new Error(`Missing report evidence: ${reference.factId}`);
+            return { id: `synthesis-${fact.id}`, kind: "calculated-fact" as const, label: `${systemNamesEn[fact.system]} · EVIDENCE`, title: fact.label, body: `${reference.contribution} ${fact.rawLabel}` };
+          }),
+          { id: "synthesis-prompt", kind: "practice", label: "REFLECTION PROMPT", title: todayInsight.reflectionPrompt, body: "Write your most direct answer, then add: what real-world facts support this feeling?" },
+        ],
+      },
+      {
+        id: "domains", number: 8, eyebrow: "07 · LIFE DOMAINS", title: "Eight life domains", subtitle: "Every theme comes from the same calculated facts and versioned rules.",
+        blocks: experience.domains.map((domain) => ({ id: `domain-${domain.id}`, kind: "traditional-reflection" as const, label: `${domain.nameEn.toUpperCase()} · ${domain.state.toUpperCase()}`, title: `${domain.nameEn} · ${domain.pattern}`, body: domain.summary })),
+      },
+      {
+        id: "practice", number: 9, eyebrow: "08 · SEVEN-DAY PRACTICE", title: lens.title, subtitle: `A week of observation around ${polarityLabel(bazi.dayMaster.polarity, "en")} ${fiveElementLabel(bazi.dayMaster.element, "en")} and “${todayInsight.title}.”`,
+        blocks: [
+          { id: "practice-lens", kind: "traditional-reflection", label: "TRADITIONAL LENS", title: "A language, not a verdict", body: lens.body },
+          { id: "practice-1", kind: "practice", label: "DAY 1–2", title: "Observe", body: "Each day, note one moment when your energy felt most focused and one when it felt most scattered. Do not explain why yet." },
+          { id: "practice-2", kind: "practice", label: "DAY 3–4", title: "Test", body: "Choose one small action to test this week’s theme, leaving room to reverse or revise it." },
+          { id: "practice-3", kind: "practice", label: "DAY 5–6", title: "Express", body: "Tell a relevant person one need, one boundary, or one question that is still unresolved." },
+          { id: "practice-4", kind: "practice", label: "DAY 7", title: lens.prompt, body: "Write down the most reliable real-world observation and one point that still cannot be confirmed." },
+        ],
+      },
+      {
+        id: "appendix", number: 10, eyebrow: "09 · NOTES & LIMITS", title: "Calculation record and limitations", subtitle: experience.schemaVersion,
+        blocks: [
+          { id: "caveat-1", kind: "methodology", label: "CAVEAT", title: "Interpretive boundary", body: "Traditional systems provide symbolic languages for reflection; they are not scientifically validated causal models or guarantees." },
+          { id: "caveat-2", kind: "methodology", label: "CAVEAT", title: "Timing boundary", body: "Dated calculations are snapshots and do not predict events, health, money, fertility, mortality, or safety." },
+          { id: "appendix-location", kind: "calculated-fact", label: "LOCATION RECORD", title: bazi.place.label, body: `${bazi.place.timeZone} · ${bazi.place.latitude.toFixed(4)}, ${bazi.place.longitude.toFixed(4)}. The location is used for calculation only in the current browser session.` },
+          { id: "appendix-engine", kind: "calculated-fact", label: "ENGINE RECORD", title: experience.schemaVersion, body: `${bazi.schemaVersion} · ${ziwei.schemaVersion} · ${western.schemaVersion} · ${experience.schemaVersion}; ${experience.engine.id} v${experience.engine.version}; calculation date ${experience.calculatedFor}; report date ${date}.` },
         ],
       },
     ],

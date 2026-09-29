@@ -3,8 +3,8 @@ import { publicSupportEmail, publicSupportUrl } from "../lib/site-config";
 import { PublicTrustLayout } from "../ui/PublicTrustLayout";
 
 export const metadata: Metadata = {
-  title: "退款政策",
-  description: "Life Map 个性化数字报告的退款资格、申请期限与撤销规则。",
+  title: "Refund Policy · 退款政策",
+  description: "Eligibility, request timing, and revocation rules for the personalized Life Map digital report. Life Map 个性化报告退款规则。",
   alternates: { canonical: "/refund" },
 };
 
@@ -15,6 +15,15 @@ export default function RefundPage() {
       eyebrow="Refunds · 退款"
       title="数字报告退款与撤销"
       summary="USD $2.00 个性化报告属于一次性数字商品。购买入口关闭时不会产生订单；开放后，以下规则适用于已验证的 Life Map 报告订单。"
+      eyebrowEn="Refunds"
+      titleEn="Digital report refunds and revocation"
+      summaryEn="The USD $2.00 personalized report is a one-time digital product. No order is created while purchase is closed; once open, these rules apply to verified Life Map report orders."
+      englishChildren={<>
+        <section><h2>While purchase is closed</h2><p>If the report page says purchase is unavailable, no valid Life Map report order is created. Do not use an old Shopify link; tell us through <a href="/support">Support</a>.</p></section>
+        <section><h2>Core policy</h2><p>This policy respects applicable consumer-protection law. A personalized digital report usually cannot be returned like a physical item after generation, but a refund or redelivery is available when:</p><ul><li>the same order is charged more than once;</li><li>a confirmed payment is followed by a system failure that prevents generation or delivery and reasonable troubleshooting does not resolve it;</li><li>the delivered file is corrupt, missing pages, or materially different from the purchased product;</li><li>applicable law requires another refund.</li></ul></section>
+        <section><h2>Reasons that normally do not qualify</h2><ul><li>changing your mind after the report has been generated;</li><li>disagreeing with a reflective interpretation or expecting a guarantee about real-world outcomes;</li><li>submitting an incorrect birth date, time, or place after the file has been generated from that input.</li></ul><p>These limits do not reduce mandatory rights under applicable law. Unless local law provides longer, submit a request within 14 calendar days of purchase. We aim to acknowledge it within five business days. Approved refunds return to the original Shopify payment method; the payment provider controls settlement timing.</p><p>After Shopify sends a refund or cancellation event, Life Map revokes download keys and deletes the private PDF. A new report requires a new generation and purchase.</p></section>
+        <section><h2>How to request help</h2><p>Provide only the order number, purchase email, and a description of the issue. Do not send full birth details. {publicSupportEmail ? <>Contact <a href={`mailto:${publicSupportEmail}`}>{publicSupportEmail}</a>.</> : publicSupportUrl ? <>Use the <a href={publicSupportUrl.toString()} rel="noreferrer">secure support form</a>.</> : <>A public support channel is not enabled, so the paid-launch gate remains closed.</>}</p><aside><p><strong>Order identification:</strong> only orders created from the current Life Map report page whose product and amount pass validation are handled. Do not send birth data or a full report in support messages.</p></aside><p><time dateTime="2026-09-28">Updated September 28, 2026</time></p></section>
+      </>}
     >
       <section>
         <h2>购买入口关闭时</h2>

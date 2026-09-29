@@ -28,6 +28,12 @@
   color: var(--color-ink-soft);
 }
 
+.topbarActions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .mark {
   --brand-mark-size: 32px;
 }
@@ -173,4 +179,10 @@
 @media (max-width: 700px) {
   .recovery { grid-template-columns: 1fr; gap: 28px; }
   .notice .primary { width: 100%; }
+}
+
+@media (max-width: 560px) {
+  .topbarActions > a {
+    display: none;
+  }
 }

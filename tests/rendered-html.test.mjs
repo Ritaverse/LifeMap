@@ -1,12 +1,18 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-async function render(path = "/") {
+async function render(path = "/", language, cookie) {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
   workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}-${path}`);
   const { default: worker } = await import(workerUrl.href);
   return worker.fetch(
-    new Request(`http://localhost${path}`, { headers: { accept: "text/html" } }),
+    new Request(`http://localhost${path}`, {
+      headers: {
+        accept: "text/html",
+        ...(language ? { "accept-language": language } : {}),
+        ...(cookie ? { cookie } : {}),
+      },
+    }),
     { ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) } },
     { waitUntil() {}, passThroughOnException() {} },
   );
@@ -32,6 +38,40 @@ test("server-renders the Life Map landing experience", async () => {
   assert.match(html, /进入商城/);
   assert.match(html, /不是科学预测/);
   assert.doesNotMatch(html, /codex-preview|react-loading-skeleton/i);
+});
+
+test("server selects English from the browser language and renders a language control", async () => {
+  const response = await render("/", "en-US,en;q=0.9,zh;q=0.5");
+  assert.equal(response.status, 200);
+  const html = await response.text();
+  assert.match(html, /<html lang="en"/i);
+  assert.match(html, /<title>Life Map · Read the symbols, become more fully yourself<\/title>/i);
+  assert.match(html, /Read the symbols/);
+  assert.match(html, /become more fully yourself/);
+  assert.match(html, /Create a free three-system snapshot/);
+  assert.match(html, /aria-label="Language"/);
+  assert.doesNotMatch(html, /正在确认你的出生档案/);
+});
+
+test("an explicit saved language overrides the browser language", async () => {
+  const response = await render("/", "en-US", "life-map-locale=zh-CN");
+  assert.equal(response.status, 200);
+  const html = await response.text();
+  assert.match(html, /<html lang="zh-CN"/i);
+  assert.match(html, /免费生成三体系快照/);
+  assert.doesNotMatch(html, /Create a free three-system snapshot/);
+});
+
+test("public trust and personalized gates follow the selected request language", async () => {
+  const privacy = await render("/privacy", "en-GB");
+  assert.equal(privacy.status, 200);
+  assert.match(await privacy.text(), /Your data begins—and stays—in your browser/);
+
+  const personalized = await render("/today", "en-US");
+  assert.equal(personalized.status, 200);
+  const html = await personalized.text();
+  assert.match(html, /Checking your birth profile/);
+  assert.doesNotMatch(html, /正在确认你的出生档案/);
 });
 
 test("server-renders public routes and safely gates personalized routes", async () => {

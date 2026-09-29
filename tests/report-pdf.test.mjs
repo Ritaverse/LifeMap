@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
-import { PDFDocument } from "pdf-lib";
+import { PDFDocument, PDFName } from "pdf-lib";
 
 import { demoBaziReading } from "../app/lib/bazi.ts";
 import { buildCalculatedExperience } from "../app/lib/experience.ts";
@@ -72,6 +72,20 @@ test("renderer writes stable, privacy-safe document metadata", async () => {
     experience.bazi.place.timeZone,
   ].filter(Boolean);
   sensitiveValues.forEach((value) => assert.doesNotMatch(metadata, new RegExp(String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))));
+});
+
+test("renderer marks an English report with the matching PDF document language", async () => {
+  const experience = buildCalculatedExperience(demoBaziReading, "2026-09-19", "en");
+  const report = buildLifeMapReport(experience, "2026-09-19");
+  const fontBytes = new Uint8Array(await readFile(fontUrl));
+  const pdfBytes = await renderLifeMapReportPdf(report, { fontBytes });
+  const pdf = await PDFDocument.load(pdfBytes, { updateMetadata: false });
+  const documentLanguage = pdf.catalog.lookup(PDFName.of("Lang"));
+
+  assert.equal(pdf.getPageCount(), 10);
+  assert.equal(documentLanguage?.decodeText(), "en");
+  assert.match(report.pages[0].title, /Life Map/);
+  assert.match(JSON.stringify(report.pages), /Western natal chart/);
 });
 
 test("private upload contains only finished PDF bytes and a content digest", async () => {

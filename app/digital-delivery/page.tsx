@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import { PublicTrustLayout } from "../ui/PublicTrustLayout";
 
 export const metadata: Metadata = {
-  title: "数字报告交付",
-  description: "Life Map USD $2 完整数字报告的生成、付款验证、邮件交付与访问恢复规则。",
+  title: "Digital Report Delivery · 数字报告交付",
+  description: "Generation, payment verification, email delivery, and access recovery for the Life Map USD $2 report. Life Map 数字报告交付规则。",
   alternates: { canonical: "/digital-delivery" },
 };
 
@@ -14,6 +14,15 @@ export default function DigitalDeliveryPage() {
       eyebrow="Digital Delivery · 数字交付"
       title="一份报告，一个清楚价格"
       summary="Life Map 只销售一款 USD $2.00 的十页个性化 PDF。购买入口会在整条私人交付链通过检查后自动开放；门槛未通过时不会进入结账。"
+      eyebrowEn="Digital Delivery"
+      titleEn="One report, one clear price"
+      summaryEn="Life Map offers one personalized ten-page PDF for USD $2.00. Purchase opens only after the full private-delivery chain passes its checks; otherwise checkout remains unavailable."
+      englishChildren={<>
+        <section><h2>Product and contents</h2><ul><li>Product: Life Map Full Personal Report, ten-page PDF, USD $2.00, one-time purchase.</li><li>Includes BaZi, Zi Wei, Western astrology, current timing, cross-system evidence, eight life domains, a seven-day practice, and limitations.</li><li>No subscription, automatic renewal, physical shipping, or hidden tier.</li><li>Free chart facts and evidence will not be hidden because reports are sold.</li></ul></section>
+        <section><h2>Delivery after payment</h2><ul><li>Your browser creates the PDF and sends a random report ID into Shopify; Shopify does not receive report text.</li><li>A file unlocks only for an HMAC-verified order whose product, currency, amount, and paid status all match.</li><li>The access link in the delivery email is valid for 24 hours. After exchange, the download session lasts 15 minutes and allows at most three downloads.</li><li>The report is retained for 30 days. During that period, request a new link from the <a href="/report/access">report recovery page</a> using the order number and purchase email.</li><li>A temporary PDF without checkout is deleted after 24 hours. A file with Shopify checkout may remain up to 32 days so a still-payable cart does not lose its delivery file.</li></ul></section>
+        <section><h2>Data boundary</h2><p>Shopify handles checkout, but Life Map does not send your chart name, birth date, birth time, birth place, chart facts, reflection content, or PDF as product attributes. Shopify may separately collect contact and payment information required for checkout; see the <a href="/privacy">Privacy Policy</a>.</p><aside><p><strong>Secure gate first:</strong> if the report page says purchase is unavailable, do not pay through an old Shopify link. Only an order created from the current Life Map report page can be delivered automatically.</p></aside></section>
+        <section><h2>If something goes wrong</h2><p>Check spam first, then use <a href="/report/access">/report/access</a> to recover access. If that does not resolve the issue, see <a href="/support">Support</a>. Do not send birth details or the full PDF.</p><p><time dateTime="2026-09-28">Updated September 28, 2026</time></p></section>
+      </>}
     >
       <section>
         <h2>商品与包含内容</h2>

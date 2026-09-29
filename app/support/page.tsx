@@ -3,8 +3,8 @@ import { publicSupportEmail, publicSupportUrl } from "../lib/site-config";
 import { PublicTrustLayout } from "../ui/PublicTrustLayout";
 
 export const metadata: Metadata = {
-  title: "支持",
-  description: "获取 Life Map 使用、隐私、计算与数字报告订单帮助。",
+  title: "Support · 支持",
+  description: "Help with Life Map use, privacy, calculations, and digital report orders. 获取 Life Map 使用与报告订单帮助。",
   alternates: { canonical: "/support" },
 };
 
@@ -15,6 +15,15 @@ export default function SupportPage() {
       eyebrow="Support · 支持"
       title="告诉我们哪里没有说清楚"
       summary="这里处理功能、可访问性、隐私、计算显示与数字报告订单问题；不提供真人命理解读或紧急支持。"
+      eyebrowEn="Support"
+      titleEn="Tell us what was not clear"
+      summaryEn="Support covers features, accessibility, privacy, calculation display, and digital report orders. It does not provide personal readings or emergency support."
+      englishChildren={<>
+        <section><h2>Contact channel</h2>{publicSupportEmail ? <p>Public support email: <a href={`mailto:${publicSupportEmail}`}>{publicSupportEmail}</a>. Do not send birth data, payment-card numbers, or other sensitive information.</p> : publicSupportUrl ? <p>Use the <a href={publicSupportUrl.toString()} rel="noreferrer">secure support form</a>. Do not send birth data, payment-card numbers, or a full PDF.</p> : <p><strong>A public support channel is not enabled yet.</strong> Paid features remain closed until the operator verifies intake and response procedures.</p>}<p>We will address report delivery and refund issues as soon as practical, but do not currently promise a fixed response time.</p></section>
+        <section><h2>Include this with a request</h2><ul><li>the page path, such as <strong>/onboarding</strong> or <strong>/life-map</strong>;</li><li>device, browser, and approximate time;</li><li>what you expected and what happened;</li><li>if you attach a screenshot, cover names, birth details, and question content first.</li></ul><p>Do not send birth date, birth time, precise location, identity documents, medical records, payment-card numbers, or another person’s data.</p></section>
+        <section><h2>Common help links</h2><ul><li>Where data is stored: <a href="/privacy">Privacy Policy</a>.</li><li>Purchase state and delivery window: <a href="/digital-delivery">Digital Delivery</a>.</li><li>Resend a download link: <a href="/report/access">Report Recovery</a>.</li><li>Refund scope: <a href="/refund">Refund Policy</a>.</li><li>Reflection-tool boundaries: <a href="/terms">Terms of Use</a>.</li></ul></section>
+        <section><h2>When you need immediate help</h2><p>Life Map is not a medical, mental-health, legal, financial, or emergency service. If you or someone else may be in immediate danger, contact local emergency services or trusted professional support instead of waiting for this site.</p><aside><p><strong>Order support:</strong> use report recovery first. When contacting support, provide only the Shopify order number, purchase email, and issue description—never birth details, card numbers, or a full PDF.</p></aside><p><time dateTime="2026-09-28">Updated September 28, 2026</time></p></section>
+      </>}
     >
       <section>
         <h2>联系渠道</h2>

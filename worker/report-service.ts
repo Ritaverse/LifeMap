@@ -21,6 +21,7 @@ import {
 import {
   D1ReportStore,
   type DeliveryOutboxRow,
+  type ReportLocale,
   type ReportJobRow,
   type ReportWorkerEnv,
 } from "./report-store.ts";
@@ -243,6 +244,14 @@ function normalizeEmail(value: unknown) {
   return email;
 }
 
+export function normalizeReportLocale(value: string | null | undefined): ReportLocale | null {
+  if (!value) return "zh-CN";
+  const normalized = value.trim().toLowerCase();
+  if (/^en(?:-|$)/.test(normalized)) return "en";
+  if (/^zh(?:-|$)/.test(normalized)) return "zh-CN";
+  return null;
+}
+
 function shopMoneyCents(value: ShopifyMoneySet | null | undefined, required = false) {
   if (!value) return required ? null : 0;
   if (value.shop_money?.currency_code !== FULL_REPORT_PRODUCT.currencyCode) return null;
@@ -441,9 +450,11 @@ export class ReportService {
     if (prefix !== "%PDF-" || !suffix.endsWith("%%EOF")) return json({ error: "报告文件未通过 PDF 校验。" }, 422);
     const pageCount = Number(request.headers.get("x-life-map-pdf-pages"));
     const schemaVersion = request.headers.get("x-life-map-report-schema");
+    const locale = normalizeReportLocale(request.headers.get("x-life-map-report-locale"));
     if (pageCount !== FULL_REPORT_PRODUCT.pages || schemaVersion !== REPORT_SCHEMA_VERSION) {
       return json({ error: "报告版本与商品不匹配。" }, 422);
     }
+    if (!locale) return json({ error: "报告语言不受支持。" }, 422);
     try {
       const parsed = await PDFDocument.load(pdf, { ignoreEncryption: false, updateMetadata: false });
       if (parsed.getPageCount() !== FULL_REPORT_PRODUCT.pages) {
@@ -465,7 +476,7 @@ export class ReportService {
     const r2Key = `reports/${id}.pdf`;
     await this.env.REPORTS.put(r2Key, pdf, {
       httpMetadata: { contentType: "application/pdf" },
-      customMetadata: { sha256: digest, pages: String(pageCount), schema: REPORT_SCHEMA_VERSION },
+      customMetadata: { sha256: digest, pages: String(pageCount), schema: REPORT_SCHEMA_VERSION, locale },
     });
     try {
       await this.store.insertPendingJob({
@@ -475,6 +486,7 @@ export class ReportService {
         size: pdf.byteLength,
         pageCount,
         schemaVersion,
+        locale,
         capabilityHash,
         createdAt: now,
         expiresAt,
@@ -488,7 +500,7 @@ export class ReportService {
       await this.env.REPORTS.delete(r2Key);
       return json({ error: "报告暂时无法进入安全交付队列。" }, 503);
     }
-    return json({ jobId: id, capability, expiresAt: new Date(expiresAt * 1000).toISOString() }, 201);
+    return json({ jobId: id, capability, expiresAt: new Date(expiresAt * 1000).toISOString(), locale }, 201);
   }
 
   private async createCheckout(request: Request, jobId: string) {
@@ -762,19 +774,19 @@ export class ReportService {
       now,
       expiresAt: now + DOWNLOAD_SESSION_SECONDS,
     });
-    return json({ available: true }, 200, {
+    return json({ available: true, locale: token.locale }, 200, {
       "set-cookie": `__Host-life_map_report_session=${encodeURIComponent(session)}; Path=/; Max-Age=${DOWNLOAD_SESSION_SECONDS}; HttpOnly; Secure; SameSite=Strict`,
     });
   }
 
   private async download(request: Request) {
-    if (!this.store || !this.env.REPORTS) return new Response("报告不可用。", { status: 503 });
+    if (!this.store || !this.env.REPORTS) return new Response("Report unavailable. 报告不可用。", { status: 503 });
     const session = cookieValue(request, "__Host-life_map_report_session");
-    if (!session) return new Response("下载会话无效或已经过期。", { status: 401 });
+    if (!session) return new Response("Download session invalid or expired. 下载会话无效或已经过期。", { status: 401 });
     const now = this.now();
     const token = await this.store.resolveToken(await sha256Hex(session), "download_session", now);
     if (!token?.r2_key || !await this.store.consumeToken(token.id, now)) {
-      return new Response("下载会话无效或已经过期。", { status: 410 });
+      return new Response("Download session invalid or expired. 下载会话无效或已经过期。", { status: 410 });
     }
     const object = await this.env.REPORTS.get(token.r2_key);
     if (!object) return new Response("报告文件已经过期。", { status: 410 });
@@ -824,6 +836,7 @@ export class ReportService {
     const recipient = await decryptString(this.env.REPORT_PII_KEY!, item.recipient_ciphertext, item.recipient_nonce);
     const rawToken = await deriveEmailLinkToken(this.env.REPORT_TOKEN_SECRET!, item.token_id, item.token_expires_at);
     const accessUrl = `${publicOrigin(this.env)}/report/access#token=${encodeURIComponent(rawToken)}`;
+    const copy = deliveryEmailCopy(item.locale, item.kind, accessUrl, publicOrigin(this.env));
     const response = await this.fetcher("https://api.resend.com/emails", {
       method: "POST",
       headers: {
@@ -834,9 +847,9 @@ export class ReportService {
       body: JSON.stringify({
         from: this.env.REPORT_DELIVERY_FROM,
         to: [recipient],
-        subject: "Your private Life Map report is ready",
-        text: `Your private Life Map PDF is ready. Open this 24-hour access link: ${accessUrl}\n\nThe report remains available for recovery for 30 days. Life Map is a reflection tool, not a scientific prediction or professional advice service.`,
-        html: `<p>Your private Life Map PDF is ready.</p><p><a href="${accessUrl}">Open your secure report access page</a></p><p>This link expires in 24 hours. You can request a new link for 30 days using your Shopify order number and purchase email.</p><p><small>Life Map is for personal reflection and cultural exploration, not scientific prediction or professional advice.</small></p>`,
+        subject: copy.subject,
+        text: copy.text,
+        html: copy.html,
       }),
     });
     if (!response.ok) throw new Error("email_provider_error");
@@ -866,6 +879,40 @@ export class ReportService {
     }
     await this.store.purgeExpiredMetadata(now);
   }
+}
+
+export function deliveryEmailCopy(
+  locale: ReportLocale,
+  kind: DeliveryOutboxRow["kind"],
+  accessUrl: string,
+  origin: string,
+) {
+  const refundUrl = `${origin}/refund`;
+  if (locale === "en") {
+    const recovery = kind === "access_recovery";
+    return {
+      subject: recovery
+        ? "Your secure Life Map report access link"
+        : "Your private Life Map report is ready",
+      text: recovery
+        ? `Here is your new secure Life Map report access link. It expires in 24 hours: ${accessUrl}\n\nYour report remains recoverable for 30 days after purchase. Digital delivery and refund terms: ${refundUrl}\n\nLife Map is for personal reflection and cultural exploration, not scientific prediction or professional advice.`
+        : `Your private Life Map PDF is ready. Open this secure 24-hour access link: ${accessUrl}\n\nYou can request a new access link for 30 days using your Shopify order number and purchase email. Digital delivery and refund terms: ${refundUrl}\n\nLife Map is for personal reflection and cultural exploration, not scientific prediction or professional advice.`,
+      html: recovery
+        ? `<p>Here is your new secure Life Map report access link.</p><p><a href="${accessUrl}">Open your secure report access page</a></p><p>This link expires in 24 hours. Your report remains recoverable for 30 days after purchase.</p><p><a href="${refundUrl}">Digital delivery and refund terms</a></p><p><small>Life Map is for personal reflection and cultural exploration, not scientific prediction or professional advice.</small></p>`
+        : `<p>Your private Life Map PDF is ready.</p><p><a href="${accessUrl}">Open your secure report access page</a></p><p>This link expires in 24 hours. You can request a new link for 30 days using your Shopify order number and purchase email.</p><p><a href="${refundUrl}">Digital delivery and refund terms</a></p><p><small>Life Map is for personal reflection and cultural exploration, not scientific prediction or professional advice.</small></p>`,
+    };
+  }
+
+  const recovery = kind === "access_recovery";
+  return {
+    subject: recovery ? "你的 Life Map 报告安全访问链接" : "你的 Life Map 私人报告已准备好",
+    text: recovery
+      ? `这是你新的 Life Map 报告安全访问链接，有效期为 24 小时：${accessUrl}\n\n购买后的 30 天内，你仍可重新申请访问链接。数字交付与退款条款：${refundUrl}\n\nLife Map 用于个人反思与文化探索，不是科学预测，也不能替代专业建议。`
+      : `你的 Life Map 私人 PDF 报告已准备好。请通过以下安全链接访问，链接有效期为 24 小时：${accessUrl}\n\n购买后的 30 天内，你可以使用 Shopify 订单号和购买邮箱重新申请链接。数字交付与退款条款：${refundUrl}\n\nLife Map 用于个人反思与文化探索，不是科学预测，也不能替代专业建议。`,
+    html: recovery
+      ? `<p>这是你新的 Life Map 报告安全访问链接。</p><p><a href="${accessUrl}">打开安全报告访问页面</a></p><p>链接有效期为 24 小时。购买后的 30 天内，你仍可重新申请访问链接。</p><p><a href="${refundUrl}">查看数字交付与退款条款</a></p><p><small>Life Map 用于个人反思与文化探索，不是科学预测，也不能替代专业建议。</small></p>`
+      : `<p>你的 Life Map 私人 PDF 报告已准备好。</p><p><a href="${accessUrl}">打开安全报告访问页面</a></p><p>链接有效期为 24 小时。购买后的 30 天内，你可以使用 Shopify 订单号和购买邮箱重新申请链接。</p><p><a href="${refundUrl}">查看数字交付与退款条款</a></p><p><small>Life Map 用于个人反思与文化探索，不是科学预测，也不能替代专业建议。</small></p>`,
+  };
 }
 
 export async function handleReportRequest(

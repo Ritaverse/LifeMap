@@ -3,8 +3,8 @@ import { publicSupportEmail, publicSupportUrl } from "../lib/site-config";
 import { PublicTrustLayout } from "../ui/PublicTrustLayout";
 
 export const metadata: Metadata = {
-  title: "隐私政策",
-  description: "了解 Life Map 如何在浏览器会话、私人报告交付与 Shopify 结账中保护出生资料。",
+  title: "Privacy Policy · 隐私政策",
+  description: "How Life Map protects birth data in the browser, private report delivery, and Shopify checkout. 了解 Life Map 如何保护出生资料。",
   alternates: { canonical: "/privacy" },
 };
 
@@ -15,6 +15,42 @@ export default function PrivacyPage() {
       eyebrow="Privacy · 隐私"
       title="你的资料，先留在你的浏览器里"
       summary="Life Map 把出生资料视为敏感信息。命盘计算与报告排版先在浏览器完成；只有你主动购买时，最终 PDF 才会上传到私人交付空间。"
+      eyebrowEn="Privacy"
+      titleEn="Your data begins—and stays—in your browser"
+      summaryEn="Life Map treats birth details as sensitive. Chart calculation and report layout happen in your browser first; only when you choose to buy is the finished PDF uploaded to private delivery storage."
+      englishChildren={<>
+        <section>
+          <h2>How we handle what you enter</h2>
+          <p>Your display name, birth date, birth time, selected birth place, and saved questions and actions are written only to <strong>sessionStorage in the current browser session</strong>. They are used to calculate and display your experience on your device.</p>
+          <ul><li>There are currently no accounts, cloud sync, or cross-device chart profiles.</li><li>There is no product analytics, advertising tracking, or live AI request.</li><li>Closing the browser session normally clears session data, although browser restore features may retain it temporarily.</li></ul>
+        </section>
+        <section>
+          <h2>What happens when you buy a report</h2>
+          <p>After you choose the full report, your browser creates the ten-page PDF and uploads only the <strong>finished file</strong> to Life Map private object storage. The database stores a random report ID, file checksum, order status, and expiration time—not the birth form or report text.</p>
+          <ul><li>A PDF without Shopify checkout is retained for at most 24 hours. A PDF linked to checkout may remain for up to 32 days to cover Shopify’s 30-day cart window and webhook delivery buffer.</li><li>After payment, the report is retained for at most 30 days from payment.</li><li>Refund, cancellation, or expiration revokes downloads and schedules the private file for deletion.</li><li>The purchase email is encrypted for delivery; the database keeps only a one-way keyed HMAC for recovery matching.</li></ul>
+          <p>The report contains your display name, chart facts, and location record. Generate it only on your own device and protect the downloaded file.</p>
+        </section>
+        <section>
+          <h2>Shopify and email boundaries</h2>
+          <p>Shopify receives only the product, quantity, USD $2.00 amount, and random report ID. Your name, birth details, location, chart facts, reflection question, and PDF are not sent as Shopify product attributes.</p>
+          <p>Shopify processes the email and payment information required for checkout under its policies. The email provider receives only the purchase email, generic delivery copy, and a short-lived access link—not the report content.</p>
+        </section>
+        <section>
+          <h2>Place search and necessary network information</h2>
+          <p>Only a city or country phrase you actively submit is sent to Open-Meteo to return a city, coordinates, and IANA time zone. Your name, birth date, and birth time are not part of that request.</p>
+          <p>Like any network service, Open-Meteo, the hosting provider, and network operators may see ordinary technical information needed to complete a request, such as IP address, browser type, and request time. See the <a href="https://open-meteo.com/en/terms" target="_blank" rel="noreferrer">Open-Meteo terms</a>.</p>
+        </section>
+        <section>
+          <h2>Your controls</h2>
+          <ul><li>Choose “Clear this birth profile” on the Me page.</li><li>Close the browser session or clear site data in browser settings.</li><li>Do not put identity documents, medical records, financial accounts, or another person’s sensitive data in reflection questions.</li></ul>
+          <aside><p><strong>Paid launch gate:</strong> the $2 purchase button opens only after database, private storage, webhooks, email, automatic cleanup, support, and public access have all been verified. Otherwise no order is created.</p></aside>
+        </section>
+        <section>
+          <h2>Contact</h2>
+          <p>For report privacy questions, use the <a href="/support">support page</a>. {publicSupportEmail ? <>The public email is <a href={`mailto:${publicSupportEmail}`}>{publicSupportEmail}</a>; do not email birth details.</> : publicSupportUrl ? <>Use the <a href={publicSupportUrl.toString()} rel="noreferrer">secure support form</a>; do not send birth details.</> : <>A public support channel is not yet enabled, so paid features remain closed.</>}</p>
+          <p><time dateTime="2026-09-28">Updated September 28, 2026</time></p>
+        </section>
+      </>}
     >
       <section>
         <h2>我们如何处理你输入的内容</h2>

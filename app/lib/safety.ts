@@ -1,3 +1,5 @@
+import { detectInputLocale, type AppLocale } from "./locale.ts";
+
 export type SafetyCategory =
   | "immediate-danger"
   | "medical-emergency"
@@ -106,9 +108,69 @@ const boundaries: Record<SafetyCategory, SafetyBoundary> = {
   },
 };
 
-export function classifySafetyConcern(input: string): SafetyBoundary | null {
+const englishBoundaries: Record<SafetyCategory, SafetyBoundary> = {
+  "immediate-danger": {
+    category: "immediate-danger",
+    urgent: true,
+    eyebrow: "IMMEDIATE SUPPORT",
+    title: "This needs timely, real-world human support",
+    message: "Life Map cannot assess immediate danger and will not use a chart to answer questions about self-harm, harm to others, or personal safety.",
+    nextSteps: ["If you or someone else is in immediate danger, contact your local emergency service now.", "Reach out to someone you trust and, if possible, do not face this alone.", "Go to the nearest emergency department, crisis center, or safe place if you can."],
+  },
+  "medical-emergency": {
+    category: "medical-emergency",
+    urgent: true,
+    eyebrow: "MEDICAL EMERGENCY",
+    title: "These symptoms need immediate real-world medical assessment",
+    message: "Life Map cannot assess chest pain, breathing difficulty, overdose, severe bleeding, or other urgent symptoms, and will not use a chart to decide whether you need care.",
+    nextSteps: ["If symptoms are happening now, contact your local emergency service or go to the nearest emergency department.", "Ask a trusted person to stay with you if possible, and tell medical staff clearly about symptoms and medication."],
+  },
+  medical: {
+    category: "medical",
+    urgent: false,
+    eyebrow: "HEALTH BOUNDARY",
+    title: "A chart cannot make health decisions",
+    message: "Life Map cannot diagnose illness, assess symptoms, recommend medication, or predict treatment outcomes.",
+    nextSteps: ["Describe your specific symptoms to a qualified clinician or local health service.", "If symptoms are sudden, severe, or worsening, contact local emergency care."],
+  },
+  legal: {
+    category: "legal",
+    urgent: false,
+    eyebrow: "LEGAL BOUNDARY",
+    title: "Legal consequences need qualified, local advice",
+    message: "Life Map cannot interpret your legal rights, deadlines, or case outcome, and will not predict whether you will win.",
+    nextSteps: ["Contact a lawyer, legal-aid service, or relevant government office in your jurisdiction.", "Keep contracts, notices, dates, and original documents for a professional to review."],
+  },
+  financial: {
+    category: "financial",
+    urgent: false,
+    eyebrow: "FINANCIAL BOUNDARY",
+    title: "Do not use a chart for investments or major financial actions",
+    message: "Life Map cannot predict returns, markets, lotteries, or financial outcomes and does not provide investment, tax, or debt advice.",
+    nextSteps: ["Check the amount, timeline, loss tolerance, and written terms first.", "For major decisions, consult a qualified professional who owes you a fiduciary duty."],
+  },
+  fertility: {
+    category: "fertility",
+    urgent: false,
+    eyebrow: "FERTILITY BOUNDARY",
+    title: "A chart cannot predict fertility or pregnancy",
+    message: "Life Map does not assess the ability to conceive, fetal health, miscarriage risk, delivery timing, or treatment outcomes.",
+    nextSteps: ["Consult an obstetrician, midwife, or fertility specialist.", "For bleeding, severe pain, or another urgent symptom, contact local medical services immediately."],
+  },
+  mortality: {
+    category: "mortality",
+    urgent: false,
+    eyebrow: "MORTALITY BOUNDARY",
+    title: "We do not predict death or lifespan",
+    message: "Destiny traditions and astrology cannot reliably determine a time of death, lifespan, or whether another person will live or die.",
+    nextSteps: ["If this comes from a health concern, contact a medical professional.", "If it comes from grief, fear, or loss, reach out to someone you trust or a local mental-health support service."],
+  },
+};
+
+export function classifySafetyConcern(input: string, locale?: AppLocale): SafetyBoundary | null {
   const normalized = input.trim();
   if (!normalized) return null;
   const matched = patterns.find(({ pattern }) => pattern.test(normalized));
-  return matched ? boundaries[matched.category] : null;
+  if (!matched) return null;
+  return (locale ?? detectInputLocale(input)) === "en" ? englishBoundaries[matched.category] : boundaries[matched.category];
 }

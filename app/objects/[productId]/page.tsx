@@ -9,7 +9,7 @@ export async function generateMetadata({ params }: { params: Promise<{ productId
   if (!product) notFound();
   return {
     title: `${product.nameZh} · ${product.nameEn}`,
-    description: product.shortDescription,
+    description: `${product.nameEn} / ${product.nameZh}. An optional symbolic object for daily reflection; no effect or outcome is promised. ${product.shortDescription}`,
     alternates: { canonical: `/objects/${product.slug}` },
   };
 }

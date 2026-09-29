@@ -139,6 +139,7 @@ export interface AskResponse {
   reflectionQuestion: string;
   relatedDomain?: DomainId;
   disclaimer: string;
+  localizedFacts?: ChartFact[];
 }
 
 export interface IChingLine {

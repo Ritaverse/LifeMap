@@ -12,6 +12,8 @@ export type ReportJobStatus =
   | "refunded"
   | "expired";
 
+export type ReportLocale = "zh-CN" | "en";
+
 export interface D1ResultLike {
   success: boolean;
   meta?: { changes?: number };
@@ -82,6 +84,7 @@ export interface ReportJobRow {
   pdf_size_bytes: number | null;
   pdf_page_count: number | null;
   report_schema_version: string;
+  locale: ReportLocale;
   job_capability_hash: string | null;
   checkout_url_ciphertext: BinaryLike | null;
   checkout_url_nonce: BinaryLike | null;
@@ -116,6 +119,7 @@ export interface ReportTokenRow {
   r2_key: string | null;
   job_expires_at: number;
   purge_lease_id: string | null;
+  locale: ReportLocale;
 }
 
 export interface DeliveryOutboxRow {
@@ -127,6 +131,8 @@ export interface DeliveryOutboxRow {
   recipient_nonce: BinaryLike | null;
   provider_idempotency_key: string;
   attempts: number;
+  kind: "initial_delivery" | "access_recovery";
+  locale: ReportLocale;
 }
 
 export interface PendingJobInput {
@@ -136,6 +142,7 @@ export interface PendingJobInput {
   size: number;
   pageCount: number;
   schemaVersion: string;
+  locale: ReportLocale;
   capabilityHash: string;
   createdAt: number;
   expiresAt: number;
@@ -152,7 +159,7 @@ export class D1ReportStore {
   async schemaReady() {
     try {
       await this.db.prepare(`
-        SELECT id, checkout_lease_id, checkout_lease_started_at FROM report_jobs LIMIT 1
+        SELECT id, locale, checkout_lease_id, checkout_lease_started_at FROM report_jobs LIMIT 1
       `).first();
       await this.db.prepare(`
         SELECT id, lease_id, lease_started_at FROM delivery_outbox LIMIT 1
@@ -183,9 +190,9 @@ export class D1ReportStore {
       INSERT INTO report_jobs (
         id, status, product_key, expected_variant_gid, expected_variant_numeric_id,
         expected_amount_cents, expected_currency, r2_key, pdf_sha256, pdf_size_bytes,
-        pdf_page_count, report_schema_version, job_capability_hash, created_at,
+        pdf_page_count, report_schema_version, locale, job_capability_hash, created_at,
         expires_at, updated_at
-      ) VALUES (?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       input.id,
       input.productKey,
@@ -198,6 +205,7 @@ export class D1ReportStore {
       input.size,
       input.pageCount,
       input.schemaVersion,
+      input.locale,
       input.capabilityHash,
       input.createdAt,
       input.expiresAt,
@@ -460,7 +468,8 @@ export class D1ReportStore {
   async dueOutbox(now: number, limit = 10) {
     const result = await this.db.prepare(`
       SELECT o.id, o.job_id, o.token_id, t.expires_at AS token_expires_at,
-        o.recipient_ciphertext, o.recipient_nonce, o.provider_idempotency_key, o.attempts
+        o.recipient_ciphertext, o.recipient_nonce, o.provider_idempotency_key, o.attempts,
+        o.kind, j.locale
       FROM delivery_outbox o JOIN report_tokens t ON t.id = o.token_id
       JOIN report_jobs j ON j.id = o.job_id
       WHERE o.status IN ('pending', 'failed', 'sending') AND o.next_attempt_at <= ?
@@ -508,7 +517,7 @@ export class D1ReportStore {
 
   resolveToken(tokenHash: string, purpose: ReportTokenRow["purpose"], now: number) {
     return this.db.prepare(`
-      SELECT t.*, j.status, j.r2_key, j.expires_at AS job_expires_at, j.purge_lease_id
+      SELECT t.*, j.status, j.r2_key, j.expires_at AS job_expires_at, j.purge_lease_id, j.locale
       FROM report_tokens t JOIN report_jobs j ON j.id = t.job_id
       WHERE t.token_hash = ? AND t.purpose = ? AND t.expires_at > ?
         AND t.revoked_at IS NULL AND t.use_count < t.max_uses
