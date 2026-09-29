@@ -3,7 +3,7 @@ import test from "node:test";
 import { createReportCheckout } from "../app/lib/shopify.ts";
 import { resolvePublicSiteUrl, resolveSupportEmail } from "../app/lib/site-config.ts";
 
-async function render(path = "/", origin = "https://life-map.ritaverse.chatgpt.site") {
+async function render(path = "/", origin = "https://lifemap.fyi") {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
   workerUrl.searchParams.set("platform-test", `${process.pid}-${Date.now()}-${path}-${origin}`);
   const { default: worker } = await import(workerUrl.href);
@@ -17,8 +17,8 @@ async function render(path = "/", origin = "https://life-map.ritaverse.chatgpt.s
 test("public site URL parsing accepts safe origins and rejects unsafe configuration", () => {
   assert.equal(resolvePublicSiteUrl("https://lifemap.example.com/path?query=1#hash").toString(), "https://lifemap.example.com/");
   assert.equal(resolvePublicSiteUrl("http://localhost:3000/path").toString(), "http://localhost:3000/");
-  assert.equal(resolvePublicSiteUrl("http://lifemap.example.com").toString(), "https://life-map.ritaverse.chatgpt.site/");
-  assert.equal(resolvePublicSiteUrl("https://user:secret@lifemap.example.com").toString(), "https://life-map.ritaverse.chatgpt.site/");
+  assert.equal(resolvePublicSiteUrl("http://lifemap.example.com").toString(), "https://lifemap.fyi/");
+  assert.equal(resolvePublicSiteUrl("https://user:secret@lifemap.example.com").toString(), "https://lifemap.fyi/");
 });
 
 test("support email appears only after an operational address is configured", () => {
@@ -46,8 +46,8 @@ test("production responses include compatible security headers", async () => {
   assert.equal(response.headers.get("x-frame-options"), "DENY");
   assert.equal(response.headers.get("strict-transport-security"), "max-age=31536000");
   const html = await response.text();
-  assert.match(html, /<link rel="canonical" href="https:\/\/life-map\.ritaverse\.chatgpt\.site\/"/);
-  assert.match(html, /<link rel="manifest" href="https:\/\/life-map\.ritaverse\.chatgpt\.site\/manifest\.webmanifest"/);
+  assert.match(html, /<link rel="canonical" href="https:\/\/lifemap\.fyi\/"/);
+  assert.match(html, /<link rel="manifest" href="https:\/\/lifemap\.fyi\/manifest\.webmanifest"/);
 });
 
 test("HSTS is only sent over HTTPS", async () => {
@@ -74,10 +74,10 @@ test("robots, sitemap, manifest, and not-found routes render", async () => {
   const sitemap = await render("/sitemap.xml");
   assert.equal(sitemap.status, 200);
   const sitemapBody = await sitemap.text();
-  assert.match(sitemapBody, /https:\/\/life-map\.ritaverse\.chatgpt\.site\/objects/);
-  assert.match(sitemapBody, /https:\/\/life-map\.ritaverse\.chatgpt\.site\/privacy/);
-  assert.match(sitemapBody, /https:\/\/life-map\.ritaverse\.chatgpt\.site\/digital-delivery/);
-  assert.match(sitemapBody, /https:\/\/life-map\.ritaverse\.chatgpt\.site\/refund/);
+  assert.match(sitemapBody, /https:\/\/lifemap\.fyi\/objects/);
+  assert.match(sitemapBody, /https:\/\/lifemap\.fyi\/privacy/);
+  assert.match(sitemapBody, /https:\/\/lifemap\.fyi\/digital-delivery/);
+  assert.match(sitemapBody, /https:\/\/lifemap\.fyi\/refund/);
   assert.doesNotMatch(sitemapBody, /\/today/);
 
   const manifest = await render("/manifest.webmanifest");

@@ -1,4 +1,4 @@
-const DEFAULT_PUBLIC_SITE_URL = "https://life-map.ritaverse.chatgpt.site";
+const DEFAULT_PUBLIC_SITE_URL = "https://lifemap.fyi";
 
 function isLocalHostname(hostname: string) {
   return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]";
