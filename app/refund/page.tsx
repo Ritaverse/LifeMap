@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { publicSupportEmail } from "../lib/site-config";
+import { publicSupportEmail, publicSupportUrl } from "../lib/site-config";
 import { PublicTrustLayout } from "../ui/PublicTrustLayout";
 
 export const metadata: Metadata = {
@@ -46,7 +46,7 @@ export default function RefundPage() {
       <section>
         <h2>如何申请</h2>
         <p>
-          申请时只需提供订单号、购买邮箱和问题说明。请勿在支持邮件中发送完整出生资料。{publicSupportEmail ? <>可联系 <a href={`mailto:${publicSupportEmail}`}>{publicSupportEmail}</a>。</> : <>公开支持邮箱尚未启用，因此付费上线门槛保持关闭。</>}
+          申请时只需提供订单号、购买邮箱和问题说明。请勿发送完整出生资料。{publicSupportEmail ? <>可联系 <a href={`mailto:${publicSupportEmail}`}>{publicSupportEmail}</a>。</> : publicSupportUrl ? <>可使用<a href={publicSupportUrl.toString()} rel="noreferrer">安全支持表单</a>。</> : <>公开支持渠道尚未启用，因此付费上线门槛保持关闭。</>}
         </p>
         <aside>
           <p><strong>订单识别：</strong>只处理从当前 Life Map 报告页创建、且商品与金额验证通过的订单。请勿在支持邮件中发送出生资料或完整报告。</p>

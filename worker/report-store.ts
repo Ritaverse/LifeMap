@@ -51,7 +51,6 @@ export interface ReportWorkerEnv {
   DB?: D1DatabaseLike;
   REPORTS?: R2BucketLike;
   PAID_REPORTS_ENABLED?: string;
-  SHOPIFY_STOREFRONT_TOKEN?: string;
   SHOPIFY_WEBHOOK_SECRET?: string;
   REPORT_TOKEN_SECRET?: string;
   REPORT_EMAIL_HASH_SECRET?: string;
@@ -61,11 +60,13 @@ export interface ReportWorkerEnv {
   REPORT_DELIVERY_FROM?: string;
   NEXT_PUBLIC_SITE_URL?: string;
   NEXT_PUBLIC_SUPPORT_EMAIL?: string;
+  NEXT_PUBLIC_SUPPORT_URL?: string;
   REPORT_WEBHOOKS_CONFIGURED?: string;
   REPORT_CLEANUP_CONFIGURED?: string;
   REPORT_PUBLIC_ACCESS_CONFIRMED?: string;
   REPORT_POLICIES_CONFIRMED?: string;
   REPORT_TEST_ORDERS_ONLY?: string;
+  REPORT_TEST_MODE_KEY?: string;
 }
 
 export interface ReportJobRow {

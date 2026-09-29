@@ -121,7 +121,7 @@ async function call(request) {
   return response;
 }
 
-async function createJob({ checkout = true, clientIp } = {}) {
+async function createJob({ checkout = true, clientIp, testKey } = {}) {
   const pdf = testPdf();
   const createResponse = await call(new Request(`${SITE_ORIGIN}/api/report/jobs`, {
     method: "POST",
@@ -132,6 +132,7 @@ async function createJob({ checkout = true, clientIp } = {}) {
       "x-life-map-pdf-pages": String(FULL_REPORT_PRODUCT.pages),
       "x-life-map-report-schema": REPORT_SCHEMA_VERSION,
       "x-life-map-pdf-sha256": sha256(pdf),
+      ...(testKey ? { "x-life-map-test-key": testKey } : {}),
     },
     body: pdf,
   }));
@@ -146,6 +147,7 @@ async function createJob({ checkout = true, clientIp } = {}) {
       headers: {
         authorization: `Bearer ${created.capability}`,
         origin: SITE_ORIGIN,
+        ...(testKey ? { "x-life-map-test-key": testKey } : {}),
       },
     },
   ));
@@ -310,7 +312,6 @@ beforeEach(() => {
     DB: db,
     REPORTS: reports,
     PAID_REPORTS_ENABLED: "true",
-    SHOPIFY_STOREFRONT_TOKEN: "storefront-test-token",
     SHOPIFY_WEBHOOK_SECRET: WEBHOOK_SECRET,
     REPORT_TOKEN_SECRET: "report-token-secret-for-tests-123456789",
     REPORT_EMAIL_HASH_SECRET: "report-email-hash-secret-for-tests-123456789",
@@ -320,11 +321,13 @@ beforeEach(() => {
     REPORT_DELIVERY_FROM: "Life Map <reports@lifemap.fyi>",
     NEXT_PUBLIC_SITE_URL: SITE_ORIGIN,
     NEXT_PUBLIC_SUPPORT_EMAIL: "support@lifemap.fyi",
+    NEXT_PUBLIC_SUPPORT_URL: "",
     REPORT_WEBHOOKS_CONFIGURED: "true",
     REPORT_CLEANUP_CONFIGURED: "true",
     REPORT_PUBLIC_ACCESS_CONFIRMED: "true",
     REPORT_POLICIES_CONFIRMED: "true",
     REPORT_TEST_ORDERS_ONLY: "false",
+    REPORT_TEST_MODE_KEY: "report-test-mode-key-for-tests-123456789",
   };
   service = new ReportService(env, { now: () => now, fetcher: fakeFetch });
 });
@@ -720,7 +723,6 @@ test("paid-launch readiness remains closed when any required production control 
     { key: "DB", value: undefined },
     { key: "REPORTS", value: undefined },
     { key: "PAID_REPORTS_ENABLED", value: "false" },
-    { key: "SHOPIFY_STOREFRONT_TOKEN", value: "" },
     { key: "SHOPIFY_WEBHOOK_SECRET", value: "short" },
     { key: "REPORT_TOKEN_SECRET", value: "short" },
     { key: "REPORT_EMAIL_HASH_SECRET", value: "short" },
@@ -728,8 +730,6 @@ test("paid-launch readiness remains closed when any required production control 
     { key: "REPORT_PII_KEY", value: "invalid" },
     { key: "RESEND_API_KEY", value: "" },
     { key: "REPORT_DELIVERY_FROM", value: "" },
-    { key: "NEXT_PUBLIC_SUPPORT_EMAIL", value: "" },
-    { key: "NEXT_PUBLIC_SUPPORT_EMAIL", value: "support@example.com" },
     { key: "REPORT_WEBHOOKS_CONFIGURED", value: "false" },
     { key: "REPORT_CLEANUP_CONFIGURED", value: "false" },
     { key: "REPORT_PUBLIC_ACCESS_CONFIRMED", value: "false" },
@@ -740,6 +740,16 @@ test("paid-launch readiness remains closed when any required production control 
   for (const { key, value } of blockedConfigurations) {
     assert.equal(hasPaidLaunchConfiguration({ ...env, [key]: value }), false, `${key} must fail closed`);
   }
+  assert.equal(hasPaidLaunchConfiguration({
+    ...env,
+    NEXT_PUBLIC_SUPPORT_EMAIL: "",
+    NEXT_PUBLIC_SUPPORT_URL: "",
+  }), false, "a public support channel is required");
+  assert.equal(hasPaidLaunchConfiguration({
+    ...env,
+    NEXT_PUBLIC_SUPPORT_EMAIL: "",
+    NEXT_PUBLIC_SUPPORT_URL: "https://dj4xdu-gb.myshopify.com/pages/contact",
+  }), true, "a monitored HTTPS support form is accepted");
 
   const gated = new ReportService({ ...env, REPORT_WEBHOOKS_CONFIGURED: "false" }, { now: () => now, fetcher: fakeFetch });
   const context = executionContext();
@@ -755,6 +765,61 @@ test("paid-launch readiness remains closed when any required production control 
   }), executionContext());
   assert.equal(create.status, 503);
   assert.equal(shopifyRequests.length, 0);
+});
+
+test("test checkout requires a server-only key while public readiness stays closed", async () => {
+  env.PAID_REPORTS_ENABLED = "false";
+  env.REPORT_TEST_ORDERS_ONLY = "true";
+  service = new ReportService(env, { now: () => now, fetcher: fakeFetch });
+
+  const readiness = await call(new Request(`${SITE_ORIGIN}/api/report/readiness`));
+  assert.deepEqual(await readiness.json(), { available: false });
+
+  const pdf = testPdf();
+  const request = (testKey) => new Request(`${SITE_ORIGIN}/api/report/jobs`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/pdf",
+      origin: SITE_ORIGIN,
+      "x-life-map-pdf-pages": String(FULL_REPORT_PRODUCT.pages),
+      "x-life-map-report-schema": REPORT_SCHEMA_VERSION,
+      "x-life-map-pdf-sha256": sha256(pdf),
+      ...(testKey ? { "x-life-map-test-key": testKey } : {}),
+    },
+    body: pdf,
+  });
+  assert.equal((await call(request())).status, 503);
+  assert.equal((await call(request("wrong-test-mode-key-that-is-long-enough"))).status, 503);
+  assert.equal(shopifyRequests.length, 0);
+
+  const job = await createJob({ testKey: env.REPORT_TEST_MODE_KEY });
+  assert.equal(job.checkout.amount, FULL_REPORT_PRODUCT.price);
+  assert.equal(shopifyRequests.length, 1);
+});
+
+test("test-only mode delivers Shopify test orders and blocks live orders", async () => {
+  env.PAID_REPORTS_ENABLED = "false";
+  env.REPORT_TEST_ORDERS_ONLY = "true";
+  service = new ReportService(env, { now: () => now, fetcher: fakeFetch });
+
+  const testJob = await createJob({ testKey: env.REPORT_TEST_MODE_KEY });
+  await pay(testJob, { id: "test-mode-order", test: true });
+  assert.equal((await jobRow(testJob.jobId)).status, "delivered");
+
+  const liveJob = await createJob({ testKey: env.REPORT_TEST_MODE_KEY });
+  const response = await call(webhookRequest("orders/paid", paidOrder(liveJob.jobId, {
+    id: "live-mode-order",
+    test: false,
+  })));
+  assert.equal(response.status, 200);
+  assert.equal((await jobRow(liveJob.jobId)).status, "review_required");
+  assert.equal(emails.length, 1);
+});
+
+test("the preflight key is inert after live checkout opens", async () => {
+  assert.equal(hasPaidLaunchConfiguration(env), true);
+  const job = await createJob({ testKey: "wrong-test-mode-key-that-is-long-enough" });
+  assert.equal(job.checkout.amount, FULL_REPORT_PRODUCT.price);
 });
 
 test("local production mode fails closed when Worker bindings are absent", async () => {

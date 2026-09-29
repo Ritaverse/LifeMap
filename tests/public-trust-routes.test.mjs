@@ -17,7 +17,7 @@ const routes = [
   ["/terms", /使用条款/, /不是科学测评/, /购买入口只有在付款验证/],
   ["/digital-delivery", /数字报告交付/, /USD \$2\.00/, /HMAC 验证/],
   ["/refund", /退款政策/, /购买入口关闭/, /14 个自然日/],
-  ["/support", /支持/, /尚未启用公开支持邮箱/, /站点会保持非公开/],
+  ["/support", /支持/, /尚未启用公开支持渠道/, /付费功能会保持关闭/],
 ];
 
 test("server-renders public beta trust routes with current-scope disclosures", async () => {

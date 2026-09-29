@@ -7,7 +7,7 @@ import {
   SHOPIFY_STOREFRONT_API_VERSION,
   SHOPIFY_STORE_DOMAIN,
 } from "../app/lib/report-product.ts";
-import { resolveSupportEmail } from "../app/lib/site-config.ts";
+import { resolveSupportEmail, resolveSupportUrl } from "../app/lib/site-config.ts";
 import {
   decryptString,
   deriveEmailLinkToken,
@@ -193,10 +193,8 @@ function hasValidPiiKey(value: string | undefined) {
   }
 }
 
-export function hasPaidLaunchConfiguration(env: ReportWorkerEnv) {
-  return env.PAID_REPORTS_ENABLED === "true"
-    && Boolean(env.DB && env.REPORTS)
-    && Boolean(env.SHOPIFY_STOREFRONT_TOKEN)
+function hasReportInfrastructureConfiguration(env: ReportWorkerEnv) {
+  return Boolean(env.DB && env.REPORTS)
     && isStrongSecret(env.SHOPIFY_WEBHOOK_SECRET)
     && isStrongSecret(env.REPORT_TOKEN_SECRET)
     && isStrongSecret(env.REPORT_EMAIL_HASH_SECRET)
@@ -207,9 +205,29 @@ export function hasPaidLaunchConfiguration(env: ReportWorkerEnv) {
     && env.REPORT_CLEANUP_CONFIGURED === "true"
     && env.REPORT_PUBLIC_ACCESS_CONFIRMED === "true"
     && env.REPORT_POLICIES_CONFIRMED === "true"
-    && env.REPORT_TEST_ORDERS_ONLY === "false"
-    && Boolean(resolveSupportEmail(env.NEXT_PUBLIC_SUPPORT_EMAIL))
+    && Boolean(resolveSupportEmail(env.NEXT_PUBLIC_SUPPORT_EMAIL) || resolveSupportUrl(env.NEXT_PUBLIC_SUPPORT_URL))
     && publicOrigin(env) === "https://lifemap.fyi";
+}
+
+export function hasPaidLaunchConfiguration(env: ReportWorkerEnv) {
+  return hasReportInfrastructureConfiguration(env)
+    && env.PAID_REPORTS_ENABLED === "true"
+    && env.REPORT_TEST_ORDERS_ONLY === "false";
+}
+
+function hasPaidTestConfiguration(env: ReportWorkerEnv) {
+  return hasReportInfrastructureConfiguration(env)
+    && env.PAID_REPORTS_ENABLED === "false"
+    && env.REPORT_TEST_ORDERS_ONLY === "true"
+    && isStrongSecret(env.REPORT_TEST_MODE_KEY);
+}
+
+async function hasPaidRequestAccess(request: Request, env: ReportWorkerEnv) {
+  if (hasPaidLaunchConfiguration(env)) return true;
+  if (!hasPaidTestConfiguration(env)) return false;
+  const provided = request.headers.get("x-life-map-test-key") ?? "";
+  if (!isStrongSecret(provided)) return false;
+  return await sha256Hex(provided) === await sha256Hex(env.REPORT_TEST_MODE_KEY!);
 }
 
 function cents(value: unknown) {
@@ -400,7 +418,7 @@ export class ReportService {
   }
 
   private async createJob(request: Request) {
-    if (!hasPaidLaunchConfiguration(this.env) || !this.store || !this.env.REPORTS) {
+    if (!await hasPaidRequestAccess(request, this.env) || !this.store || !this.env.REPORTS) {
       return json({ error: "付费报告仍在完成上线检查，暂时不能结账。" }, 503);
     }
     if (!isSameOriginRequest(request, this.env)) return json({ error: "请求来源无法验证。" }, 403);
@@ -474,7 +492,7 @@ export class ReportService {
   }
 
   private async createCheckout(request: Request, jobId: string) {
-    if (!hasPaidLaunchConfiguration(this.env) || !this.store || !this.env.REPORTS) {
+    if (!await hasPaidRequestAccess(request, this.env) || !this.store || !this.env.REPORTS) {
       return json({ error: "付费报告仍在完成上线检查，暂时不能结账。" }, 503);
     }
     if (!isSameOriginRequest(request, this.env) || !JOB_ID_PATTERN.test(jobId)) {
@@ -516,7 +534,6 @@ export class ReportService {
         method: "POST",
         headers: {
           "content-type": "application/json",
-          "x-shopify-storefront-access-token": this.env.SHOPIFY_STOREFRONT_TOKEN!,
         },
         body: JSON.stringify({ query: CREATE_FULL_REPORT_CART_MUTATION, variables: { input: cartInput(jobId) } }),
       });

@@ -15,13 +15,13 @@ Life Map sells one product: **Life Map Full Personal Report**, a 10-page PDF pri
 
 - Apply every migration in `drizzle/` to the `DB` D1 binding in filename order.
 - Bind a private R2 bucket as `REPORTS`.
-- Run the worker scheduled handler regularly and add an R2 lifecycle backstop longer than 32 days.
-- Verify a Resend domain and sender, then configure a monitored support inbox.
+- The deployed worker runs the scheduled cleanup handler hourly. Add an R2 lifecycle backstop longer than 32 days when the host exposes bucket lifecycle controls.
+- Verify a Resend domain and sender, then configure a monitored support email or HTTPS form.
 - Keep all runtime secrets server-only. Generate independent 32+ character token, email-HMAC, rate-limit, and Shopify webhook secrets; `REPORT_PII_KEY` must be a base64-encoded 32-byte key.
 
 ## Shopify Setup
 
-Create a Storefront API token for the Life Map sales channel and subscribe these topics to `https://lifemap.fyi/api/webhooks/shopify` using API version `2026-07`:
+The cart uses Shopify's tokenless Storefront Cart API. Subscribe these topics to `https://lifemap.fyi/api/webhooks/shopify` using API version `2026-07`:
 
 - `orders/paid`
 - `orders/cancelled`
@@ -37,9 +37,11 @@ Leave `PAID_REPORTS_ENABLED=false` until the site is public and all controls pas
 - `REPORT_WEBHOOKS_CONFIGURED=true`
 - `REPORT_CLEANUP_CONFIGURED=true`
 - `REPORT_POLICIES_CONFIRMED=true`
-- `REPORT_TEST_ORDERS_ONLY=false`
+- `REPORT_TEST_ORDERS_ONLY=true` during preflight
 
-Then run one Shopify test purchase and verify: checkout → paid webhook → one email → download → recovery → cancellation → refund → expired cleanup. Confirm duplicate webhooks send no duplicate email and invalid amount, variant, currency, signature, or unpaid orders create no entitlement. Enable `PAID_REPORTS_ENABLED=true` last; `/api/report/readiness` must still return `available: true` before the UI opens checkout.
+Set a strong server-only `REPORT_TEST_MODE_KEY`, then run one Shopify test purchase by sending that key only in the `x-life-map-test-key` header. Public `/api/report/readiness` stays closed throughout preflight. Verify checkout → paid webhook → one email → download → recovery → cancellation → refund → expired cleanup. Confirm duplicate webhooks send no duplicate email and invalid amount, variant, currency, signature, or unpaid orders create no entitlement.
+
+For launch, rotate or remove the test key and switch the two flags together: `REPORT_TEST_ORDERS_ONLY=false` and `PAID_REPORTS_ENABLED=true`. `/api/report/readiness` must return `available: true` before the UI opens checkout.
 
 ## Retention
 

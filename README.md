@@ -34,7 +34,7 @@ CI runs `typecheck → lint → unit tests → build → production-artifact tes
 
 ## Configuration and deployment
 
-Copy `.env.example` to an ignored `.env.local` when local configuration is needed. `NEXT_PUBLIC_SITE_URL` sets the canonical HTTPS origin. Set `NEXT_PUBLIC_SUPPORT_EMAIL` only after that mailbox and its response process are operational. Shopify, email, encryption, and rate-limit secrets are server-only; never prefix them with `NEXT_PUBLIC_` or commit them. Apply all `drizzle/` migrations and bind D1 as `DB` and private R2 as `REPORTS` before testing fulfillment.
+Copy `.env.example` to an ignored `.env.local` when local configuration is needed. `NEXT_PUBLIC_SITE_URL` sets the canonical HTTPS origin. Configure either `NEXT_PUBLIC_SUPPORT_EMAIL` or a monitored `NEXT_PUBLIC_SUPPORT_URL` only after its response process is operational. Shopify, email, encryption, and rate-limit secrets are server-only; never prefix them with `NEXT_PUBLIC_` or commit them. Apply all `drizzle/` migrations and bind D1 as `DB` and private R2 as `REPORTS` before testing fulfillment.
 
 The existing Sites project is identified by `.openai/hosting.json`. Before deploying, run the full quality suite, publish an owner-only/private version first, verify the policy and onboarding routes, and keep paid checkout unavailable. Security headers, crawler rules, personalized-route `noindex`, sitemap, and error pages are implemented at the app/worker boundary.
 

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { resolvePublicSiteUrl, resolveSupportEmail } from "../app/lib/site-config.ts";
+import { resolvePublicSiteUrl, resolveSupportEmail, resolveSupportUrl } from "../app/lib/site-config.ts";
 
 async function render(path = "/", origin = "https://lifemap.fyi") {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
@@ -25,6 +25,10 @@ test("support email appears only after an operational address is configured", ()
   assert.equal(resolveSupportEmail(" support@ritaverse.com "), "support@ritaverse.com");
   assert.equal(resolveSupportEmail("support@example.com"), null);
   assert.equal(resolveSupportEmail("not-an-email"), null);
+  assert.equal(resolveSupportUrl("https://dj4xdu-gb.myshopify.com/pages/contact")?.hostname, "dj4xdu-gb.myshopify.com");
+  assert.equal(resolveSupportUrl("http://dj4xdu-gb.myshopify.com/pages/contact"), null);
+  assert.equal(resolveSupportUrl("https://user:pass@example.com/contact"), null);
+  assert.equal(resolveSupportUrl("https://example.org/contact"), null);
 });
 
 test("production responses include compatible security headers", async () => {

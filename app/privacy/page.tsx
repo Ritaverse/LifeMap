@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { publicSupportEmail } from "../lib/site-config";
+import { publicSupportEmail, publicSupportUrl } from "../lib/site-config";
 import { PublicTrustLayout } from "../ui/PublicTrustLayout";
 
 export const metadata: Metadata = {
@@ -72,7 +72,7 @@ export default function PrivacyPage() {
 
       <section>
         <h2>联系我们</h2>
-        <p>如需报告隐私问题，请前往<a href="/support">支持页面</a>。{publicSupportEmail ? <>当前公开邮箱是 <a href={`mailto:${publicSupportEmail}`}>{publicSupportEmail}</a>；请勿通过邮件发送出生资料。</> : <>公开邮箱尚未启用，站点会在地址与处理流程验证完成前保持非公开。</>}</p>
+        <p>如需报告隐私问题，请前往<a href="/support">支持页面</a>。{publicSupportEmail ? <>当前公开邮箱是 <a href={`mailto:${publicSupportEmail}`}>{publicSupportEmail}</a>；请勿通过邮件发送出生资料。</> : publicSupportUrl ? <>当前使用<a href={publicSupportUrl.toString()} rel="noreferrer">安全支持表单</a>；请勿发送出生资料。</> : <>公开支持渠道尚未启用，付费功能会保持关闭。</>}</p>
         <p><time dateTime="2026-09-28">更新日期：2026 年 9 月 28 日</time></p>
       </section>
     </PublicTrustLayout>

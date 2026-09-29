@@ -26,3 +26,16 @@ export function resolveSupportEmail(value = process.env.NEXT_PUBLIC_SUPPORT_EMAI
 }
 
 export const publicSupportEmail = resolveSupportEmail();
+
+export function resolveSupportUrl(value = process.env.NEXT_PUBLIC_SUPPORT_URL): URL | null {
+  try {
+    const url = new URL(value?.trim() || "");
+    if (url.protocol !== "https:" || url.username || url.password) return null;
+    if (!["lifemap.fyi", "dj4xdu-gb.myshopify.com"].includes(url.hostname.toLowerCase())) return null;
+    return url;
+  } catch {
+    return null;
+  }
+}
+
+export const publicSupportUrl = resolveSupportUrl();

@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
-import { publicSupportEmail } from "../lib/site-config";
+import { publicSupportEmail, publicSupportUrl } from "../lib/site-config";
 import { PublicTrustLayout } from "../ui/PublicTrustLayout";
 
 export const metadata: Metadata = {
   title: "支持",
-  description: "获取 Life Map 公开测试版的使用、隐私、计算与未来数字报告帮助。",
+  description: "获取 Life Map 使用、隐私、计算与数字报告订单帮助。",
   alternates: { canonical: "/support" },
 };
 
@@ -14,16 +14,18 @@ export default function SupportPage() {
       currentPath="/support"
       eyebrow="Support · 支持"
       title="告诉我们哪里没有说清楚"
-      summary="公开测试版欢迎功能、可访问性、隐私与计算显示问题。测试期间不提供真人命理解读、紧急支持或订单处理。"
+      summary="这里处理功能、可访问性、隐私、计算显示与数字报告订单问题；不提供真人命理解读或紧急支持。"
     >
       <section>
         <h2>联系渠道</h2>
         {publicSupportEmail ? (
           <p>公开支持邮箱：<a href={`mailto:${publicSupportEmail}`}>{publicSupportEmail}</a>。请勿发送出生资料、付款卡号或其他敏感信息。</p>
+        ) : publicSupportUrl ? (
+          <p>使用<a href={publicSupportUrl.toString()} rel="noreferrer">安全支持表单</a>联系我们。请勿发送出生资料、付款卡号或完整 PDF。</p>
         ) : (
-          <p><strong>尚未启用公开支持邮箱。</strong>站点会保持非公开，直到运营方验证可收件地址与回复流程；请勿把任何地址猜作官方支持渠道。</p>
+          <p><strong>尚未启用公开支持渠道。</strong>付费功能会保持关闭，直到运营方验证可收件渠道与回复流程。</p>
         )}
-        <p>测试期暂不承诺固定响应时效。未来开放销售前，会在这里公布可用渠道和预计回复时间。</p>
+        <p>我们会尽快处理报告交付与退款问题，但目前不承诺固定响应时效。</p>
       </section>
 
       <section>
