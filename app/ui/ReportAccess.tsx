@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { type FormEvent, useEffect, useState } from "react";
 import { exchangeReportAccessToken, requestReportAccess } from "../lib/shopify";
+import { BrandMark } from "./BrandMark";
 import styles from "./report-access.module.css";
 
 type AccessState = "idle" | "checking" | "ready" | "invalid" | "sending" | "sent" | "error";
@@ -39,7 +40,7 @@ export function ReportAccess() {
   return (
     <div className={styles.page}>
       <header className={styles.topbar}>
-        <Link href="/" aria-label="Life Map 首页"><span aria-hidden="true">◌</span><strong>Life Map</strong></Link>
+        <Link href="/" aria-label="Life Map 首页"><BrandMark className={styles.mark} /><strong>Life Map</strong></Link>
         <Link href="/support">需要帮助</Link>
       </header>
       <main className={styles.main}>

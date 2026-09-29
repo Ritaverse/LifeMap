@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { BrandMark } from "./BrandMark";
 import styles from "./public-trust.module.css";
 
 const trustLinks = [
@@ -26,7 +27,7 @@ export function PublicTrustLayout({ currentPath, eyebrow, title, summary, childr
       <header className={styles.topbar}>
         <div className={styles.topbarInner}>
           <Link className={styles.wordmark} href="/" aria-label="Life Map 首页">
-            <span className={styles.mark} aria-hidden="true" />
+            <BrandMark className={styles.mark} />
             <span>
               <strong>Life Map</strong>
               <small>观星读象 · 照见自己</small>
@@ -77,4 +78,3 @@ export function PublicTrustLayout({ currentPath, eyebrow, title, summary, childr
     </div>
   );
 }
-

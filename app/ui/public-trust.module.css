@@ -53,37 +53,7 @@
 }
 
 .mark {
-  position: relative;
-  width: 30px;
-  height: 30px;
-  flex: 0 0 30px;
-  border: 1px solid rgb(225 185 255 / 68%);
-  border-radius: 50%;
-  box-shadow: 0 0 18px rgb(178 106 255 / 18%);
-}
-
-.mark::before,
-.mark::after {
-  position: absolute;
-  content: "";
-}
-
-.mark::before {
-  inset: 6px 9px;
-  border: 1px solid var(--color-jade);
-  border-radius: 100% 0 100% 0;
-  transform: rotate(45deg);
-}
-
-.mark::after {
-  top: 50%;
-  left: 50%;
-  width: 4px;
-  height: 4px;
-  border-radius: 50%;
-  background: var(--color-cinnabar);
-  box-shadow: 0 0 9px var(--color-cinnabar);
-  transform: translate(-50%, -50%);
+  --brand-mark-size: 32px;
 }
 
 .homeLink {
@@ -328,4 +298,3 @@
     transition-duration: .01ms !important;
   }
 }
-

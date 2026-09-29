@@ -28,14 +28,8 @@
   color: var(--color-ink-soft);
 }
 
-.topbar a:first-child span {
-  display: grid;
-  width: 32px;
-  height: 32px;
-  place-items: center;
-  border: 1px solid var(--color-gold-muted);
-  border-radius: 50%;
-  color: var(--color-cinnabar);
+.mark {
+  --brand-mark-size: 32px;
 }
 
 .main {

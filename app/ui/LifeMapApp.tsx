@@ -23,6 +23,7 @@ import type { SafetyBoundary } from "../lib/safety";
 import type { AskResponse, DomainId, EvidenceRef, IChingLine, Product, SystemId } from "../lib/types";
 import type { WesternReading } from "../lib/western";
 import type { ZiweiReading } from "../lib/ziwei";
+import { BrandMark } from "./BrandMark";
 
 type RouteName = "landing" | "onboarding" | "generating" | "today" | "insight" | "life-map" | "domain" | "ask" | "iching" | "timing" | "objects" | "product" | "report" | "me";
 
@@ -104,17 +105,6 @@ function useSessionFocus() {
     if (focusOptions.some((item) => item.id === value)) queueMicrotask(() => setFocus(value as ReflectionFocus));
   }, []);
   return focus;
-}
-
-function BrandMark({ large = false }: { large?: boolean }) {
-  return (
-    <span className={`brand-mark ${large ? "brand-mark--large" : ""}`} aria-hidden="true">
-      <span className="brand-mark__orbit" />
-      <span className="brand-mark__lens" />
-      <span className="brand-mark__self" />
-      <span className="brand-mark__anchors"><i /><i /><i /><i /></span>
-    </span>
-  );
 }
 
 function BrandLockup({ tagline = false }: { tagline?: boolean }) {

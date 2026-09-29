@@ -24,7 +24,8 @@ test("server-renders the Life Map landing experience", async () => {
   assert.match(html, /同路社区仍在生长/);
   assert.match(html, /COMMUNITY IN THE MAKING/);
   assert.match(html, /aria-label="Life Map 首页"/);
-  assert.match(html, /brand-mark__orbit/);
+  assert.match(html, /\/images\/brand\/life-map-star-mark\.webp/);
+  assert.doesNotMatch(html, /brand-mark__lens|brand-mark__orbit/);
   assert.match(html, /life-map-social\.jpg/);
   assert.match(html, /免费生成三体系快照/);
   assert.match(html, /象征物商城/);
